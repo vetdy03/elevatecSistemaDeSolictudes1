@@ -1,0 +1,7 @@
+al dalr eclik en otificaciones deberia mandarle directamente a la vista al cual se le mandola notificacion 
+
+historial de lotes deberia de poder desplegar
+
+deberia de poder ver la secretaria el estado de cauntso rechazados aceptados
+la secretaria no llegas sus notificaciones al admin
+mandar un link osea permitir copiar un link y mandarselo
