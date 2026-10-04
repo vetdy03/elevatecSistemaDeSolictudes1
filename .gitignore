@@ -1,0 +1,19 @@
+# Configuración local y secretos
+.env
+backend/.env
+
+# Datos persistentes de Docker (MySQL, archivos subidos)
+data/
+
+# Dependencias y builds
+node_modules/
+frontend/dist/
+backend/vendor/
+
+# Editor / SO
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db
+*.log

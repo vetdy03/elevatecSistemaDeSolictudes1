@@ -1,0 +1,26 @@
+# Desarrollo local (Windows/macOS):
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+#   cd frontend && npm install && npm run dev     → http://localhost:5173 (hot reload)
+# La app compilada sigue disponible en http://localhost:8080
+
+services:
+  app:
+    build:
+      target: dev
+    image: fincontrol-app:dev
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      LOG_LEVEL: debug
+    volumes:
+      - ./backend:/var/www/html
+
+  db:
+    ports:
+      - "3307:3306"
+    volumes:
+      # Volumen con nombre: más rápido y sin problemas de permisos que un bind mount en Windows
+      - mysql_dev:/var/lib/mysql
+
+volumes:
+  mysql_dev:
