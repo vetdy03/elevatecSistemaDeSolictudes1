@@ -1,0 +1,41 @@
+Actúa como un Desarrollador Full-Stack Senior experto en Laravel, React (TypeScript), MySQL, Docker y Git.
+
+Tengo una aplicación Frontend ya estructurada en React + TypeScript + Tailwind CSS creada con Magic Patterns (proyecto Vite con App.tsx, componentes TopNav, RequestTable, HistoryPanel, etc.). Nuestro objetivo es construir el Backend en Laravel, la Base de Datos en MySQL, conectar el Frontend existente mediante API REST y empaquetar todo con Docker para desplegar en un servidor Synology DS925+ y GitHub.
+
+SITUACIÓN Y ESTRUCTURA ACTUAL DEL FRONTEND:
+1. Las interfaces ya están construidas en React/TSX con tipos e interfaces:
+   - RequestStatus: "Pendiente" | "Aprobado" | "Rechazado"
+   - FinancialRequest: id, date, detail, amount, currency, procedure, requester, priority, region, category, status.
+   - Roles definidos: "Admin", "Secretaría", "Colaborador".
+2. Funcionalidades de UI a mantener en el Frontend:
+   - Vista móvil adaptada (cards limpias con botones "Aprobar" / "Rechazar" directos, sin popovers ni motivos de rechazo).
+   - Recálculo de totales dinámico (Aprobado, Rechazado, Pendiente) al hacer clic en las acciones.
+   - Validación al "Finalizar Lote": resalta filas pendientes con animación y muestra SweetAlert2.
+   - Rol Secretaría: Importación simulada de Excel/CSV, creación manual y descarga de reportes.
+   - Rol Colaborador: Modo lectura (viewer).
+
+TAREAS DE BACKEND Y BASE DE DATOS (A IMPLEMENTAR):
+1. Diseña e implementa la Base de Datos MySQL con Laravel Migrations:
+   - Tabla 'users': id, name, email, password, role ('admin', 'secretaria', 'colaborador').
+   - Tabla 'batches': id, code (ej: N° 08-SEP-26), title, uploaded_by, status ('pendiente', 'completado'), completed_at.
+   - Tabla 'requests': id, batch_id, item_number, request_date, detail, amount, currency, procedure, requester, priority ('Alta', 'Media', 'Baja'), region, category, status ('Pendiente', 'Aprobado', 'Rechazado'), reviewed_by.
+2. Crea los Seeders iniciales con los datos que actualmente están en 'src/data/requests.ts' (initialRequests y batchHistory) para poblar la BD al iniciar.
+3. API REST Controllers en Laravel:
+   - Autenticación con Laravel Sanctum (Login, Logout, User info).
+   - BatchController: Listar lotes, obtener lote activo, finalizar lote.
+   - RequestController: Cambiar estado ("Aprobado" / "Rechazado"), agregar fila manual.
+   - ExcelController: Procesar carga masiva de Excel (.xlsx) con 'maatwebsite/excel' y exportación con filtros.
+   - PdfController: Exportación de reportes con 'barryvdh/laravel-dompdf'.
+4. Conecta el Frontend (reemplaza el estado local 'initialRequests' por llamadas HTTP a la API de Laravel mediante React Custom Hooks o Fetch/Axios).
+
+ENTORNO DOCKER Y DESPLIEGUE:
+1. Genera los archivos Dockerfile y docker-compose.yml:
+   - Servicio 'app': PHP 8.2 FPM + Node.js (para compilar assets o servir Vite).
+   - Servicio 'web': Nginx para servir el Frontend y derivar peticiones /api a Laravel.
+   - Servicio 'db': MySQL 8.0 con volumen persistente mapeado.
+2. Configuración de Git:
+   - Asegúrate de incluir un .gitignore adecuado.
+   - Genera un README.md con las instrucciones exactas para ejecutar `docker-compose up -d`, ejecutar migraciones/seeders y desplegar en Synology Container Manager.
+
+INSTRUCCIONES PARA CLAUDE CODE:
+Analiza el código Frontend existente que te compartiré, proponme la estructura de directorios del proyecto Full-Stack (ej. carpeta /backend y /frontend o estructura monolítica integrada) y pregúntame cualquier duda sobre el entorno antes de comenzar.

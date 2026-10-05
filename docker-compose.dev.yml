@@ -1,6 +1,6 @@
 # Desarrollo local (Windows/macOS):
 #   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
-#   cd frontend && npm install && npm run dev     → http://localhost:5173 (hot reload)
+#   cd frontend && npm install && npm run dev     → http://localhost:5180 (hot reload)
 # La app compilada sigue disponible en http://localhost:8080
 
 services:

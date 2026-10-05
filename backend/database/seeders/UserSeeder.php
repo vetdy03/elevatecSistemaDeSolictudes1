@@ -12,7 +12,7 @@ class UserSeeder extends Seeder
         $password = env('SEED_USER_PASSWORD', 'FinControl2026!');
 
         $users = [
-            ['name' => 'Alejandro Montaño', 'email' => 'admin@fincontrol.local', 'role' => User::ROLE_ADMIN],
+            ['name' => 'Grover Jaldin', 'email' => 'admin@fincontrol.local', 'role' => User::ROLE_ADMIN],
             ['name' => 'Patricia Quispe', 'email' => 'secretaria@fincontrol.local', 'role' => User::ROLE_SECRETARIA],
             ['name' => 'Marco Gutiérrez', 'email' => 'colaborador@fincontrol.local', 'role' => User::ROLE_COLABORADOR],
         ];

@@ -110,7 +110,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml exec app php arti
 # Frontend con recarga en caliente
 cd frontend
 npm install
-npm run dev        # http://localhost:5173  (deriva /api y /sanctum a http://localhost:8080)
+npm run dev        # http://localhost:5180  (deriva /api y /sanctum a http://localhost:8080)
 ```
 
 - MySQL queda expuesto en `localhost:3307` para clientes como DBeaver o Workbench.

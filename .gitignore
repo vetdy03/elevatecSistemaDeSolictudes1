@@ -9,6 +9,7 @@ data/
 node_modules/
 frontend/dist/
 backend/vendor/
+guia.txt
 
 # Editor / SO
 .idea/
