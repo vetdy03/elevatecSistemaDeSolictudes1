@@ -4,6 +4,7 @@ import { useAuth } from "../hooks/useAuth";
 import { useNotifications } from "../hooks/useNotifications";
 import { formatLongDate } from "../lib/format";
 import { Batch, User } from "../types";
+import logo from "../assets/images.jpg";
 
 export type { UserRole } from "../types";
 
@@ -53,12 +54,16 @@ export function TopNav({ user, batch, pendingBatches, onSelectBatch }: TopNavPro
     <header className="sticky top-0 z-40 w-full border-b border-slate-200 bg-white/95 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-between px-4 sm:px-6 lg:px-8">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-950 text-white shadow-sm">
-            <ShieldCheckIcon className="h-5 w-5" aria-hidden="true" />
-          </div>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-bold tracking-tight text-slate-950">Jalmeco</p>
-            <p className="hidden text-xs font-medium text-slate-500 sm:block">Gestión de solicitudes</p>
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl text-white shadow-sm">
+                        <img
+                        src={logo}
+                        alt="Elevatec" 
+                        className="h-15 w-15 rounded-xl border border-slate-200 bg-white object-contain p-.5 shadow-sm"
+                        />              
+                    </div>
+          <div>
+            <p className="font-michroma font-bold text-sm tracking-widest text-slate-950">ELEVATEC</p>
+            <p className="text-xs font-medium text-slate-500">Gestión de solicitudes</p>
           </div>
           <div ref={batchRef} className="relative ml-3 hidden items-center gap-2 border-l border-slate-200 pl-5 lg:flex">
             <span className="text-xs font-medium text-slate-500">{batch?.status === "Completado" ? "Lote" : "Lote activo"}</span>
