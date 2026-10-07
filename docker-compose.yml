@@ -63,6 +63,9 @@ services:
     container_name: fincontrol-db
     restart: unless-stopped
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    ports:
+      # Solo accesible desde el propio equipo (127.0.0.1), para clientes como DBeaver o la extensión Database de VS Code.
+      - "127.0.0.1:${DB_HOST_PORT:-3307}:3306"
     environment:
       MYSQL_DATABASE: ${DB_DATABASE:-fincontrol}
       MYSQL_USER: ${DB_USERNAME:-fincontrol}

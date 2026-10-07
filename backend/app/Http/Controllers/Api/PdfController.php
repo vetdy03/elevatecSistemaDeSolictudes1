@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ReportFilterRequest;
 use App\Models\FinancialRequest;
+use App\Support\Money;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Response;
 
@@ -20,10 +21,11 @@ class PdfController extends Controller
         $rows = $request->rows($batch);
         $full = $request->boolean('full');
 
+        // Montos por moneda (Bs y USD no se suman entre sí)
         $summary = [
-            'requested' => (float) $rows->sum('amount'),
-            'approved' => (float) $rows->where('status', FinancialRequest::STATUS_APPROVED)->sum('amount'),
-            'rejected' => (float) $rows->where('status', FinancialRequest::STATUS_REJECTED)->sum('amount'),
+            'requested' => Money::totals($rows),
+            'approved' => Money::totals($rows, FinancialRequest::STATUS_APPROVED),
+            'rejected' => Money::totals($rows, FinancialRequest::STATUS_REJECTED),
             'pending' => $rows->where('status', FinancialRequest::STATUS_PENDING)->count(),
         ];
 

@@ -4,6 +4,7 @@ namespace App\Exports;
 
 use App\Models\Batch;
 use App\Models\FinancialRequest;
+use App\Support\Money;
 use Illuminate\Database\Eloquent\Collection;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
@@ -60,9 +61,22 @@ class RequestsExport implements FromArray, WithHeadings, WithStyles, WithColumnF
             $r->reviewed_at?->format('d/m/Y H:i') ?? '',
         ])->all();
 
-        $data[] = ['', '', 'SUMA TOTAL', (float) $this->rows->sum('amount')];
+        // Un total por moneda: Bs y USD no se suman entre sí.
+        foreach ($this->totalRows() as $currency => $amount) {
+            $data[] = ['', '', "SUMA TOTAL {$currency}", $amount, $currency];
+        }
 
         return $data;
+    }
+
+    /**
+     * @return array<string, float> moneda => total (USD solo si hay filas en dólares)
+     */
+    private function totalRows(): array
+    {
+        $totals = Money::totals($this->rows);
+
+        return $totals['USD'] > 0 ? $totals : ['Bs' => $totals['Bs']];
     }
 
     public function columnFormats(): array
@@ -72,7 +86,8 @@ class RequestsExport implements FromArray, WithHeadings, WithStyles, WithColumnF
 
     public function styles(Worksheet $sheet): array
     {
-        $lastRow = $this->rows->count() + 4;
+        $firstTotalRow = $this->rows->count() + 4;
+        $lastTotalRow = $firstTotalRow + count($this->totalRows()) - 1;
 
         $sheet->mergeCells('A1:M1');
         $sheet->mergeCells('A2:M2');
@@ -85,7 +100,6 @@ class RequestsExport implements FromArray, WithHeadings, WithStyles, WithColumnF
                 'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
                 'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '0F172A']],
             ],
-            $lastRow => ['font' => ['bold' => true]],
-        ];
+        ] + array_fill_keys(range($firstTotalRow, $lastTotalRow), ['font' => ['bold' => true]]);
     }
 }

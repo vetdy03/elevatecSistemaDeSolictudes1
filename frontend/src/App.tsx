@@ -38,12 +38,20 @@ function Workspace({ user }: { user: User }) {
   const batchState = useBatch(selectedBatchId);
   const { batches: pendingBatches } = useBatches({ status: "Pendiente" }, refreshKey);
 
+  // Cambia cada vez que se pide abrir un lote (notificación, histórico, selector):
+  // la página lo usa para saltar a la pestaña donde ese lote se ve.
+  const [focusSignal, setFocusSignal] = useState(0);
+  const { reload: reloadBatch } = batchState;
+
   const refreshBatches = useCallback(() => setRefreshKey((key) => key + 1), []);
 
   const openBatch = useCallback((id: number | null) => {
-    setSelectedBatchId(id);
+    // Si ya es el lote abierto, se recarga para mostrar sus datos más recientes.
+    if (id === selectedBatchId) reloadBatch();
+    else setSelectedBatchId(id);
+    setFocusSignal((signal) => signal + 1);
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }, []);
+  }, [selectedBatchId, reloadBatch]);
 
   return (
     <div className="min-h-screen w-full bg-slate-50 font-sans text-slate-900">
@@ -52,6 +60,7 @@ function Workspace({ user }: { user: User }) {
         role={user.role}
         batchState={batchState}
         refreshKey={refreshKey}
+        focusSignal={focusSignal}
         onBatchesChanged={refreshBatches}
         onOpenBatch={openBatch}
       />

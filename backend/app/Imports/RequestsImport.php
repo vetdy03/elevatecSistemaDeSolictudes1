@@ -78,11 +78,12 @@ class RequestsImport implements ToCollection, WithHeadingRow, WithCalculatedForm
             }
 
             $row = [
+                'line' => $line,
                 'date' => $this->parseDate($field('date')),
                 'detail' => $field('detail'),
                 'amount' => $this->parseAmount($field('amount')),
                 'currency' => $this->parseCurrency($field('currency')),
-                'procedure' => $field('procedure') !== null ? (string) $field('procedure') : null,
+                'procedure' => $field('procedure') !== null ? trim((string) $field('procedure')) : null,
                 'requester' => $field('requester'),
                 'priority' => $this->parsePriority($field('priority')),
                 'region' => $field('region'),

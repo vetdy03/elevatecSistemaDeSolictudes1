@@ -5,6 +5,7 @@ namespace App\Notifications;
 use App\Models\Batch;
 use App\Models\FinancialRequest;
 use App\Models\User;
+use App\Support\Money;
 use Illuminate\Notifications\Notification;
 
 /**
@@ -23,20 +24,18 @@ class BatchCompleted extends Notification
 
     public function toArray(object $notifiable): array
     {
-        $requests = $this->batch->requests()->get(['amount', 'status']);
-        $approved = $requests->where('status', FinancialRequest::STATUS_APPROVED);
-        $rejected = $requests->where('status', FinancialRequest::STATUS_REJECTED);
+        $requests = $this->batch->requests()->get(['amount', 'currency', 'status']);
 
         return [
             'batch_id' => $this->batch->id,
             'code' => $this->batch->code,
             'title' => "Lote {$this->batch->code} finalizado",
             'message' => sprintf(
-                '%s aprobó %d y rechazó %d solicitudes. Total aprobado: Bs %s.',
+                '%s aprobó %d y rechazó %d solicitudes. Total aprobado: %s.',
                 $this->completedBy->name,
-                $approved->count(),
-                $rejected->count(),
-                number_format((float) $approved->sum('amount'), 0, ',', '.'),
+                $requests->where('status', FinancialRequest::STATUS_APPROVED)->count(),
+                $requests->where('status', FinancialRequest::STATUS_REJECTED)->count(),
+                Money::format(Money::totals($requests, FinancialRequest::STATUS_APPROVED), 0),
             ),
         ];
     }

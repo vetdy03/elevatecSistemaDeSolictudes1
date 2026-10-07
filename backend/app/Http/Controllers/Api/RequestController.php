@@ -67,29 +67,46 @@ class RequestController extends Controller
             'category.required' => 'Selecciona la categoría.',
         ]);
 
-        $batch = Batch::findOrFail($data['batch_id']);
+        $procedure = trim($data['procedure']);
+        $inSameBatch = FinancialRequest::where('batch_id', $data['batch_id'])->where('procedure', $procedure)->exists();
+        $existing = FinancialRequest::findByProcedures([$procedure])->first();
 
-        if ($batch->isCompleted()) {
-            return response()->json(['message' => "El lote {$batch->code} ya fue finalizado."], 422);
+        if ($inSameBatch) {
+            return response()->json([
+                'message' => "El N° de trámite {$procedure} ya está en este lote.",
+                'errors' => ['procedure' => ["El N° de trámite {$procedure} ya está en este lote."]],
+            ], 422);
         }
 
-        $row = DB::transaction(fn () => $batch->requests()->create([
-            'item_number' => $batch->nextItemNumber(),
-            'request_date' => $data['date'] ?? now()->toDateString(),
-            'detail' => $data['detail'],
-            'amount' => $data['amount'],
-            'currency' => $data['currency'] ?? 'Bs',
-            'procedure' => $data['procedure'],
-            'requester' => $data['requester'],
-            'priority' => $data['priority'],
-            'region' => $data['region'],
-            'category' => mb_strtoupper($data['category']),
-            'status' => FinancialRequest::STATUS_PENDING,
-        ]));
+        $row = DB::transaction(function () use ($data, $procedure) {
+            // Bloquea el lote: dos filas agregadas a la vez no reciben el mismo N° de ítem.
+            $batch = Batch::whereKey($data['batch_id'])->lockForUpdate()->firstOrFail();
 
-        $batch->touch();
+            if ($batch->isCompleted()) {
+                abort(response()->json(['message' => "El lote {$batch->code} ya fue finalizado."], 422));
+            }
 
-        return (new FinancialRequestResource($row))->response()->setStatusCode(201);
+            return $batch->requests()->create([
+                'item_number' => $batch->nextItemNumber(),
+                'request_date' => $data['date'] ?? now()->toDateString(),
+                'detail' => $data['detail'],
+                'amount' => $data['amount'],
+                'currency' => $data['currency'] ?? 'Bs',
+                'procedure' => $procedure,
+                'requester' => $data['requester'],
+                'priority' => $data['priority'],
+                'region' => $data['region'],
+                'category' => mb_strtoupper($data['category']),
+                'status' => FinancialRequest::STATUS_PENDING,
+            ]);
+        });
+
+        // Repetido en OTRO lote: se permite (puede ser un reingreso), pero se avisa.
+        $warning = $existing
+            ? "Atención: el N° de trámite {$procedure} ya existe en el lote {$existing->batch->code} ({$existing->status})."
+            : null;
+
+        return (new FinancialRequestResource($row))->additional(['warning' => $warning])->response()->setStatusCode(201);
     }
 
     /**

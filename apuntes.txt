@@ -5,3 +5,13 @@ historial de lotes deberia de poder desplegar
 deberia de poder ver la secretaria el estado de cauntso rechazados aceptados
 la secretaria no llegas sus notificaciones al admin
 mandar un link osea permitir copiar un link y mandarselo
+
+
+
+MEJORAS
+
+Quiero com admin rechazar y a la hora de rechazar quiero que se despliegue un modal con areatex para ingresar el motivo de mi rechazo y una opcion que diga solictar mas informacion 
+que sea secuencias por el lapso del mes nomas el numero de lote
+notificiones de parte de la secretaria no le llegan al admin
+
+si una solicitud de un lote ha sido rechazado y el admin a solicitado mas informacion 

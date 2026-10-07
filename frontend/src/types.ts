@@ -33,7 +33,9 @@ export interface Batch {
   completedAt: string | null;
   updatedAt: string;
   uploadedBy?: string | null;
+  /** Total en Bs (los USD van aparte en totalUsd: nunca se suman entre sí) */
   total: number;
+  totalUsd: number;
   items: number;
   requests?: FinancialRequest[];
 }
@@ -68,8 +70,12 @@ export interface NewRequestInput {
   category: string;
 }
 
+/** Montos por moneda. Bs y USD nunca se suman entre sí. */
+export type MoneyTotals = Record<Currency, number>;
+
 export interface ImportPreview {
   rows: Array<{
+    line: number;
     date: string;
     detail: string;
     amount: number;
@@ -81,6 +87,8 @@ export interface ImportPreview {
     category: string;
   }>;
   errors: string[];
-  total: number;
+  /** Avisos que no bloquean la publicación (p. ej. N° de trámite ya usado en otro lote) */
+  warnings: string[];
+  totals: MoneyTotals;
   suggestedCode: string;
 }

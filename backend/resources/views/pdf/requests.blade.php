@@ -1,5 +1,6 @@
 @php
     $money = fn ($v) => number_format((float) $v, 2, ',', '.');
+    $totals = fn ($rows) => \App\Support\Money::format(\App\Support\Money::totals($rows));
     $colspan = $full ? 12 : 10;
 @endphp
 <!DOCTYPE html>
@@ -51,9 +52,9 @@
 
 <table class="metrics">
     <tr>
-        <td><div class="label">Total solicitado</div><div class="value">Bs {{ $money($summary['requested']) }}</div></td>
-        <td><div class="label">Total aprobado</div><div class="value approved">Bs {{ $money($summary['approved']) }}</div></td>
-        <td><div class="label">Total rechazado</div><div class="value rejected">Bs {{ $money($summary['rejected']) }}</div></td>
+        <td><div class="label">Total solicitado</div><div class="value">{{ \App\Support\Money::format($summary['requested']) }}</div></td>
+        <td><div class="label">Total aprobado</div><div class="value approved">{{ \App\Support\Money::format($summary['approved']) }}</div></td>
+        <td><div class="label">Total rechazado</div><div class="value rejected">{{ \App\Support\Money::format($summary['rejected']) }}</div></td>
         <td><div class="label">Filas pendientes</div><div class="value pending">{{ $summary['pending'] }}</div></td>
     </tr>
 </table>
@@ -88,14 +89,14 @@
             </tr>
         @endforeach
         @if ($full)
-            <tr class="subtotal"><td colspan="3">Subtotal {{ $category }}</td><td class="right">{{ $money($items->sum('amount')) }}</td><td colspan="{{ $colspan - 4 }}"></td></tr>
+            <tr class="subtotal"><td colspan="3">Subtotal {{ $category }}</td><td class="right">{{ $totals($items) }}</td><td colspan="{{ $colspan - 4 }}"></td></tr>
         @endif
     @empty
         <tr><td colspan="{{ $colspan }}" style="text-align:center; padding:20px; color:#64748b;">No hay solicitudes con estos filtros.</td></tr>
     @endforelse
     </tbody>
     <tfoot>
-    <tr><td colspan="3">SUMA TOTAL GENERAL</td><td class="right">Bs {{ $money($summary['requested']) }}</td><td colspan="{{ $colspan - 4 }}"></td></tr>
+    <tr><td colspan="3">SUMA TOTAL GENERAL</td><td class="right">{{ \App\Support\Money::format($summary['requested']) }}</td><td colspan="{{ $colspan - 4 }}"></td></tr>
     </tfoot>
 </table>
 </body>

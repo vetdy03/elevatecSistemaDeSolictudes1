@@ -57,8 +57,8 @@ export function TopNav({ user, batch, pendingBatches, onSelectBatch }: TopNavPro
             <ShieldCheckIcon className="h-5 w-5" aria-hidden="true" />
           </div>
           <div className="min-w-0">
-            <p className="truncate text-sm font-bold tracking-tight text-slate-950">FinControl</p>
-            <p className="hidden text-xs font-medium text-slate-500 sm:block">Gestión de recursos</p>
+            <p className="truncate text-sm font-bold tracking-tight text-slate-950">Jalmeco</p>
+            <p className="hidden text-xs font-medium text-slate-500 sm:block">Gestión de solicitudes</p>
           </div>
           <div ref={batchRef} className="relative ml-3 hidden items-center gap-2 border-l border-slate-200 pl-5 lg:flex">
             <span className="text-xs font-medium text-slate-500">{batch?.status === "Completado" ? "Lote" : "Lote activo"}</span>

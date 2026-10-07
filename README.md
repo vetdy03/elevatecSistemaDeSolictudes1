@@ -71,13 +71,15 @@ Abre `http://localhost:8080` (o tu `APP_URL`).
 
 | Rol | Correo | Contraseña |
 |-----|--------|------------|
-| Admin | `admin@fincontrol.local` | valor de `SEED_USER_PASSWORD` (por defecto `FinControl2026!`) |
-| Secretaría | `secretaria@fincontrol.local` | ídem |
-| Colaborador | `colaborador@fincontrol.local` | ídem |
+| Admin | `groverj@jalmeco.com` | valor de `SEED_USER_PASSWORD` (por defecto `FinControl2026!`) |
+| Secretaría | `jhennyg@jalmeco.com` | ídem |
+| Colaborador | `colaborador1@jalmeco.com` | ídem |
 
-> ⚠️ Cambia `SEED_USER_PASSWORD` antes de sembrar en producción.
+> ⚠️ Cambia `SEED_USER_PASSWORD` antes de sembrar en producción, y pide a cada usuario que cambie su contraseña.
 >
-> ⚠️ **No ejecutes `db:seed` otra vez sobre datos reales.** Vuelve a dejar los lotes de ejemplo (04-JUL a 08-SEP) en su estado inicial y se pierden las decisiones tomadas en ellos.
+> `db:seed` es **seguro de repetir**: solo crea los usuarios que falten (no cambia contraseñas de usuarios existentes) y solo crea los lotes de ejemplo si la base de datos **no tiene ningún lote**.
+>
+> ⚠️ Las contraseñas deben guardarse **cifradas**. Para cambiarlas usa `tinker` (ver abajo); un `UPDATE users SET password='texto'` por SQL deja al usuario sin poder iniciar sesión.
 
 ### Comandos útiles
 
@@ -98,14 +100,20 @@ docker compose exec app php artisan tinker --execute="App\Models\User::create(['
 
 Roles válidos: `admin`, `secretaria`, `colaborador`.
 
+Para cambiar una contraseña (Laravel la cifra automáticamente):
+
+```bash
+docker compose exec app php artisan tinker --execute="App\Models\User::where('email','correo@empresa.com')->first()->update(['password'=>'NuevaClave123']);"
+```
+
 ---
 
 ## 2. Desarrollo local
 
 ```bash
-# Backend + MySQL (el código de ./backend se monta en vivo, MySQL en un volumen con nombre)
+# Backend en vivo: Laravel lee ./backend directamente (los cambios en PHP se ven al recargar).
+# Usa la MISMA base de datos que el modo normal (./data/mysql).
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
-docker compose -f docker-compose.yml -f docker-compose.dev.yml exec app php artisan db:seed --force
 
 # Frontend con recarga en caliente
 cd frontend
@@ -113,8 +121,9 @@ npm install
 npm run dev        # http://localhost:5180  (deriva /api y /sanctum a http://localhost:8080)
 ```
 
-- MySQL queda expuesto en `localhost:3307` para clientes como DBeaver o Workbench.
-- Para correr Composer o Artisan: `docker compose exec app composer require …` / `php artisan …`.
+- Trabaja en **http://localhost:5180**. El puerto 8080 muestra la copia compilada del frontend (se actualiza con `docker compose up -d --build web`).
+- MySQL queda expuesto solo en tu equipo, en `127.0.0.1:3307` (usuario y contraseña: `DB_USERNAME` / `DB_PASSWORD` del `.env`), para DBeaver, Workbench o la extensión Database de VS Code.
+- `vendor/` vive en un volumen de Docker (en Windows, leerlo desde la carpeta compartida hace cada petición ~5 s más lenta). Si cambias `composer.json`: `docker compose -f docker-compose.yml -f docker-compose.dev.yml exec app composer install`.
 - No hace falta tener PHP ni Composer instalados en el equipo.
 
 ---

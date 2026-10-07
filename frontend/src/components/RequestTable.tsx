@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import { CheckIcon, XIcon } from "lucide-react";
-import { formatCurrency, formatShortDate } from "../lib/format";
+import { formatCurrency, formatMoney, formatShortDate, sumByCurrency } from "../lib/format";
 import { FinancialRequest, RequestStatus } from "../types";
 
 interface RequestTableProps {
@@ -35,7 +35,7 @@ export function RequestTable({ requests, onStatusChange, viewer = false, highlig
             </React.Fragment>)}
           </tbody>
           <tfoot className="border-t-2 border-slate-300 bg-slate-950 text-white">
-            <tr><td colSpan={3} className="px-5 py-4 text-sm font-bold">SUMA TOTAL GENERAL</td><td className="px-3 py-4 text-right text-base font-bold">Bs {formatCurrency(requests.reduce((sum, request) => sum + request.amount, 0))}</td><td colSpan={6} /></tr>
+            <tr><td colSpan={3} className="px-5 py-4 text-sm font-bold">SUMA TOTAL GENERAL</td><td className="px-3 py-4 text-right text-base font-bold">{formatMoney(sumByCurrency(requests))}</td><td colSpan={6} /></tr>
           </tfoot>
         </table>
       </div>
@@ -47,9 +47,9 @@ export function RequestTable({ requests, onStatusChange, viewer = false, highlig
             <StatusBadge status={request.status} />
           </div>
           <div className="mt-3 flex items-end justify-between gap-4"><div><p className="text-xs text-slate-500">Importe solicitado</p><p className="text-lg font-bold tabular-nums text-slate-950">{request.currency} {formatCurrency(request.amount)}</p></div><span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-bold ring-1 ring-inset ${priorityClasses[request.priority]}`}>{request.priority.toUpperCase()}</span></div>
-          <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-xs"><span className="text-slate-500">{request.requester} · {request.region}</span>{viewer ? <StatusBadge status={request.status} /> : <Actions request={request} onStatusChange={onStatusChange} viewer={viewer} />}</div>
+          <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-xs"><span className="text-slate-500">{request.requester} · {request.region}</span>{!viewer && <Actions request={request} onStatusChange={onStatusChange} viewer={viewer} />}</div>
         </article>)}
-        <div className="bg-slate-950 px-4 py-4 text-white"><p className="text-xs font-bold tracking-wide text-slate-300">SUMA TOTAL GENERAL</p><p className="mt-1 text-xl font-bold">Bs {formatCurrency(requests.reduce((sum, request) => sum + request.amount, 0))}</p></div>
+        <div className="bg-slate-950 px-4 py-4 text-white"><p className="text-xs font-bold tracking-wide text-slate-300">SUMA TOTAL GENERAL</p><p className="mt-1 text-xl font-bold">{formatMoney(sumByCurrency(requests))}</p></div>
       </div>
     </section>);
 

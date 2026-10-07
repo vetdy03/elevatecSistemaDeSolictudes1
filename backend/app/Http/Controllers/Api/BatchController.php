@@ -62,7 +62,7 @@ class BatchController extends Controller
 
     public function show(Batch $batch): BatchResource
     {
-        $batch->load(['requests.reviewer', 'uploader'])->loadCount('requests as items')->loadSum('requests as total', 'amount');
+        $batch->load(['requests.reviewer', 'uploader'])->loadTotals();
 
         return new BatchResource($batch);
     }
@@ -71,6 +71,10 @@ class BatchController extends Controller
     {
         if ($batch->isCompleted()) {
             return response()->json(['message' => "El lote {$batch->code} ya fue finalizado."], 422);
+        }
+
+        if (! $batch->requests()->exists()) {
+            return response()->json(['message' => "El lote {$batch->code} no tiene solicitudes; no se puede finalizar."], 422);
         }
 
         $pending = $batch->requests()->where('status', FinancialRequest::STATUS_PENDING)->pluck('id');

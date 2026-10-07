@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -21,6 +22,9 @@ class FinancialRequest extends Model
 
     protected $table = 'requests';
 
+    /** Cualquier cambio en una fila actualiza la "Última actualización" (updated_at) de su lote. */
+    protected $touches = ['batch'];
+
     protected $fillable = [
         'batch_id', 'item_number', 'request_date', 'detail', 'amount', 'currency', 'procedure',
         'requester', 'priority', 'region', 'category', 'status', 'reviewed_by', 'reviewed_at',
@@ -33,6 +37,25 @@ class FinancialRequest extends Model
             'amount' => 'decimal:2',
             'reviewed_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Solicitudes ya registradas con alguno de estos N° de trámite (sin distinguir mayúsculas).
+     *
+     * @param  list<string>  $procedures
+     * @return Collection<string, self>  clave = N° de trámite en mayúsculas
+     */
+    public static function findByProcedures(array $procedures): Collection
+    {
+        if (! $procedures) {
+            return new Collection;
+        }
+
+        return static::query()
+            ->with('batch:id,code')
+            ->whereIn('procedure', array_values(array_unique($procedures)))
+            ->get(['id', 'batch_id', 'procedure', 'status'])
+            ->keyBy(fn (self $row) => mb_strtoupper(trim($row->procedure)));
     }
 
     public function batch(): BelongsTo

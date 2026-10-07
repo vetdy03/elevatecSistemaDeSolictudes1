@@ -21,7 +21,9 @@ class BatchResource extends JsonResource
             'completedAt' => $this->completed_at?->toIso8601String(),
             'updatedAt' => $this->updated_at->toIso8601String(),
             'uploadedBy' => $this->whenLoaded('uploader', fn () => $this->uploader?->name),
-            'total' => (float) ($this->total ?? $this->requests()->sum('amount')),
+            // Totales separados por moneda: Bs y USD nunca se suman entre sí.
+            'total' => (float) ($this->total ?? $this->requests()->where('currency', 'Bs')->sum('amount')),
+            'totalUsd' => (float) ($this->total_usd ?? $this->requests()->where('currency', 'USD')->sum('amount')),
             'items' => (int) ($this->items ?? $this->requests()->count()),
             'requests' => FinancialRequestResource::collection($this->whenLoaded('requests')),
         ];

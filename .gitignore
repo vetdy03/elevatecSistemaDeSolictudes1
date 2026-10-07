@@ -10,6 +10,8 @@ node_modules/
 frontend/dist/
 backend/vendor/
 guia.txt
+apuntes.txt
+comandos.txt
 
 # Editor / SO
 .idea/

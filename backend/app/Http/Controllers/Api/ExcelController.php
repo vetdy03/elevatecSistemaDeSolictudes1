@@ -10,6 +10,7 @@ use App\Http\Resources\BatchResource;
 use App\Imports\RequestsImport;
 use App\Models\Batch;
 use App\Models\FinancialRequest;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -30,13 +31,50 @@ class ExcelController extends Controller
         $request->validate(['file' => self::FILE_RULES], $this->fileMessages());
 
         $import = $this->parse($request->file('file'));
+        $warnings = $this->checkDuplicates($import);
+        $rows = collect($import->rows);
 
         return response()->json([
             'rows' => $import->rows,
             'errors' => $import->errors,
-            'total' => round(array_sum(array_column($import->rows, 'amount')), 2),
+            'warnings' => $warnings,
+            // Totales por moneda: Bs y USD no se suman entre sí.
+            'totals' => [
+                'Bs' => round((float) $rows->where('currency', 'Bs')->sum('amount'), 2),
+                'USD' => round((float) $rows->where('currency', 'USD')->sum('amount'), 2),
+            ],
             'suggestedCode' => Batch::nextCode(),
         ]);
+    }
+
+    /**
+     * N° de trámite repetidos:
+     *  - dentro del mismo archivo → error (bloquea la publicación);
+     *  - ya registrados en otro lote → advertencia (se permite publicar, puede ser un reingreso).
+     *
+     * @return list<string> advertencias
+     */
+    private function checkDuplicates(RequestsImport $import): array
+    {
+        $byProcedure = collect($import->rows)->groupBy(fn (array $row) => mb_strtoupper($row['procedure']));
+
+        foreach ($byProcedure as $procedure => $rows) {
+            if ($rows->count() > 1) {
+                $import->errors[] = "El N° de trámite {$rows->first()['procedure']} está repetido en las filas ".$rows->pluck('line')->implode(', ').'.';
+            }
+        }
+
+        $existing = FinancialRequest::findByProcedures($byProcedure->keys()->all());
+
+        return $byProcedure
+            ->filter(fn ($rows, $procedure) => $existing->has($procedure))
+            ->map(function ($rows, $procedure) use ($existing) {
+                $match = $existing->get($procedure);
+
+                return "Fila {$rows->first()['line']}: el N° de trámite {$rows->first()['procedure']} ya existe en el lote {$match->batch->code} ({$match->status}).";
+            })
+            ->values()
+            ->all();
     }
 
     /**
@@ -50,6 +88,7 @@ class ExcelController extends Controller
         ], $this->fileMessages() + ['title.required' => 'Ingresa el título del lote.']);
 
         $import = $this->parse($request->file('file'));
+        $this->checkDuplicates($import);
 
         if ($import->errors) {
             return response()->json([
@@ -58,14 +97,35 @@ class ExcelController extends Controller
             ], 422);
         }
 
-        $batch = DB::transaction(function () use ($import, $data, $request) {
-            $batch = Batch::create([
-                'code' => Batch::nextCode(),
-                'title' => mb_strtoupper($data['title']),
-                'uploaded_by' => $request->user()->id,
-                'status' => Batch::STATUS_PENDING,
-            ]);
+        // Si dos personas publican a la vez, ambas pueden calcular el mismo código:
+        // la segunda choca con el índice único y se reintenta con el código siguiente.
+        for ($attempt = 1; ; $attempt++) {
+            try {
+                $batch = DB::transaction(fn () => $this->createBatch($import, $data['title'], $request->user()->id));
+                break;
+            } catch (UniqueConstraintViolationException $e) {
+                if ($attempt >= 3) {
+                    throw $e;
+                }
+            }
+        }
 
+        $batch->loadTotals();
+
+        return (new BatchResource($batch))->response()->setStatusCode(201);
+    }
+
+    private function createBatch(RequestsImport $import, string $title, int $userId): Batch
+    {
+        $batch = Batch::create([
+            'code' => Batch::nextCode(),
+            'title' => mb_strtoupper($title),
+            'uploaded_by' => $userId,
+            'status' => Batch::STATUS_PENDING,
+        ]);
+
+        // Sin "touch" del lote por cada fila: el lote se acaba de crear.
+        FinancialRequest::withoutTouching(function () use ($batch, $import) {
             foreach ($import->rows as $i => $row) {
                 $batch->requests()->create([
                     'item_number' => $i + 1,
@@ -81,13 +141,9 @@ class ExcelController extends Controller
                     'status' => FinancialRequest::STATUS_PENDING,
                 ]);
             }
-
-            return $batch;
         });
 
-        $batch->loadCount('requests as items')->loadSum('requests as total', 'amount');
-
-        return (new BatchResource($batch))->response()->setStatusCode(201);
+        return $batch;
     }
 
     public function export(ReportFilterRequest $request): BinaryFileResponse

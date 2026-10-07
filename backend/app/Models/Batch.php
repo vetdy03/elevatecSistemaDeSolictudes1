@@ -40,11 +40,23 @@ class Batch extends Model
     }
 
     /**
-     * Agrega total solicitado y cantidad de filas sin cargar las solicitudes.
+     * Agrega cantidad de filas y total solicitado POR MONEDA (Bs y USD no se suman entre sí).
      */
     public function scopeWithTotals(Builder $query): Builder
     {
-        return $query->withCount('requests as items')->withSum('requests as total', 'amount');
+        return $query->withCount('requests as items')
+            ->withSum(['requests as total' => fn ($q) => $q->where('currency', 'Bs')], 'amount')
+            ->withSum(['requests as total_usd' => fn ($q) => $q->where('currency', 'USD')], 'amount');
+    }
+
+    /**
+     * Igual que scopeWithTotals, para un lote ya cargado.
+     */
+    public function loadTotals(): static
+    {
+        return $this->loadCount('requests as items')
+            ->loadSum(['requests as total' => fn ($q) => $q->where('currency', 'Bs')], 'amount')
+            ->loadSum(['requests as total_usd' => fn ($q) => $q->where('currency', 'USD')], 'amount');
     }
 
     /**

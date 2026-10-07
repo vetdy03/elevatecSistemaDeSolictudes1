@@ -20,7 +20,9 @@ export function LoginPage() {
     } catch (err) {
       if (err instanceof ApiError && err.status === 422) setError("Correo o contraseña incorrectos.");
       else if (err instanceof ApiError && err.status === 429) setError("Demasiados intentos. Espera un minuto e inténtalo de nuevo.");
-      else setError("No se pudo conectar con el servidor.");
+      else if (err instanceof ApiError) setError(`El servidor respondió con un error (${err.status}). Inténtalo de nuevo; si persiste, avisa al administrador.`);
+      // Sin respuesta: servidor apagado o sin red (en local: ¿Docker está encendido?)
+      else setError("No se pudo conectar con el servidor. Verifica tu conexión.");
     } finally {
       setSubmitting(false);
     }
@@ -41,7 +43,7 @@ export function LoginPage() {
 
         <form onSubmit={submit} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <h1 className="text-xl font-bold tracking-tight text-slate-950">Iniciar sesión</h1>
-          <p className="mt-1 text-sm text-slate-500">Ingresa con tu cuenta institucional.</p>
+          <p className="mt-1 text-sm text-slate-500">Ingresa con tu cuenta.</p>
 
           <label className="mt-6 block text-xs font-semibold text-slate-600" htmlFor="email">Correo electrónico</label>
           <div className="relative mt-1.5">

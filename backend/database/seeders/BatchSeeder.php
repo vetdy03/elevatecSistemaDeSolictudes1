@@ -46,6 +46,13 @@ class BatchSeeder extends Seeder
 
     public function run(): void
     {
+        // Seguro de repetir: si ya hay lotes (datos reales), no toca nada.
+        if (Batch::exists()) {
+            $this->command?->warn('BatchSeeder omitido: ya existen lotes en la base de datos.');
+
+            return;
+        }
+
         mt_srand(2026);
 
         $admin = User::where('role', User::ROLE_ADMIN)->first();
