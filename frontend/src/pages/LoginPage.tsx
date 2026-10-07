@@ -3,6 +3,7 @@ import { EyeIcon, EyeOffIcon, LoaderCircleIcon, LockIcon, MailIcon, ShieldCheckI
 import { ApiError } from "../api/client";
 import { useAuth } from "../hooks/useAuth";
 import logo from "../assets/images.jpg";
+import logoliteral from "../assets/logo-elevatec.svg";
 
 export function LoginPage() {
   const { login } = useAuth();
@@ -39,10 +40,12 @@ export function LoginPage() {
               src={logo}
               alt="Elevatec" 
               className="h-15 w-15 rounded-xl border border-slate-200 bg-white object-contain p-.5 shadow-sm"
-              />              
+              />   
+                         
           </div>
           <div>
-            <p className="font-michroma font-bold text-sm tracking-widest text-slate-950">ELEVATEC</p>
+            <img src={logoliteral} className="h-10 w-auto" alt="Elevatec Logo" width="100" />
+
             <p className="text-xs font-medium text-slate-500">Gestión de solicitudes</p>
           </div>
         </div>

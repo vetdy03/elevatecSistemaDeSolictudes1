@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 430 56" role="img" aria-labelledby="title">
+  <title id="title">ELEVATEC</title>
+  <rect width="320" height="560" fill="#ffffff"/>
+  <g fill="none" stroke="#000000" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M62 17H19q-3 0-3 3v17q0 3 3 3h43M16 28.5h45"/>
+    <path d="M70 17v19q0 4 4 4h37"/>
+    <path d="M166 17h-43q-3 0-3 3v17q0 3 3 3h43M120 28.5h44"/>
+    <path d="m175 17 20 23q2 2 4 0l20-23"/>
+    <path d="m220 40 19-23q2-2 4 0l19 23"/>
+    <path d="M266 17h41M286.5 17v23"/>
+    <path d="M362 17h-41q-3 0-3 3v17q0 3 3 3h41M318 28.5h43"/>
+    <path d="M418 17h-35q-9 0-9 9v5q0 9 9 9h35"/>
+  </g>
+</svg>

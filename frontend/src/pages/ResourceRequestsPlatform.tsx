@@ -103,7 +103,7 @@ interface AdminProps {onReset: () => void;batchState: BatchState;totals: Totals;
 function AdminWorkspace({ onReset, batchState, totals, adminTab, setAdminTab, updateStatus, finalize, highlightPending, refreshKey, onOpenBatch }: AdminProps) {
   const { batch, requests, loading, error } = batchState;
   const completed = batch?.status === "Completado";
-  return <><div className="mb-6 flex flex-col gap-4 border-b border-slate-200 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-sm font-semibold text-blue-800">Aprobación principal</p><h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Centro de decisiones</h1></div><nav aria-label="Secciones de administrador" className="flex gap-5"><Tab label="Lote activo" active={adminTab === "activo"} onClick={() => setAdminTab("activo")} /><Tab label="Histórico de lotes" active={adminTab === "historial"} onClick={() => setAdminTab("historial")} /></nav></div>
+  return <><div className="mb-6 border-b border-slate-200"><nav aria-label="Secciones de administrador" className="flex gap-5"><Tab label="Lote activo" active={adminTab === "activo"} onClick={() => setAdminTab("activo")} /><Tab label="Histórico de lotes" active={adminTab === "historial"} onClick={() => setAdminTab("historial")} /></nav></div>
     {adminTab === "activo" ? <BatchStatus loading={loading} error={error} batch={batch} onReset={onReset}>{batch && <><BatchHeading batch={batch} totals={totals} /><RequestTable requests={requests} onStatusChange={updateStatus} highlightPending={highlightPending} viewer={completed} />
       {completed ? <div className="mt-5 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"><strong>Lote finalizado</strong>{batch.completedAt && ` el ${formatLongDate(batch.completedAt)}`}. Las decisiones ya no pueden modificarse.</div> : <div className="mt-5 flex flex-col items-start justify-between gap-3 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 sm:flex-row sm:items-center"><p className="text-sm text-blue-950"><strong>Control de cierre:</strong> {requests.length === 0 ? "Este lote no tiene solicitudes; no se puede finalizar." : totals.pending ? `${totals.pending} solicitudes esperan tu decisión.` : "Todas las solicitudes fueron revisadas."}</p><button onClick={finalize} disabled={requests.length === 0} type="button" className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-800 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-colors duration-150 hover:bg-blue-950 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"><SendIcon className="h-4 w-4" />Finalizar y notificar lote</button></div>}</>}</BatchStatus> : <HistoryPanel onOpen={onOpenBatch} refreshKey={refreshKey} />}</>;
 }
@@ -144,7 +144,7 @@ function ImportCard({ onPublished }: {onPublished: () => void;}) {
       setPreview(result);
       const [year, month, day] = todayIso().split("-");
       const months = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
-      setTitle(`SOLICITUDES DE RECURSOS — AL ${Number(day)} DE ${months[Number(month) - 1]} ${year}`);
+      setTitle(`SOLICITUDES AL ${Number(day)} DE ${months[Number(month) - 1]} ${year}`);
     } catch (err) {
       reset();
       Swal.fire({ icon: "error", title: "No se pudo leer el archivo", text: errorMessage(err, "Verifica el archivo e inténtalo de nuevo."), confirmButtonColor: "#0f4c81" });

@@ -5,6 +5,7 @@ import { useNotifications } from "../hooks/useNotifications";
 import { formatLongDate } from "../lib/format";
 import { Batch, User } from "../types";
 import logo from "../assets/images.jpg";
+import logoliteral from "../assets/logo-elevatec.svg";
 
 export type { UserRole } from "../types";
 
@@ -52,7 +53,7 @@ export function TopNav({ user, batch, pendingBatches, onSelectBatch }: TopNavPro
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-200 bg-white/95 backdrop-blur">
-      <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-between px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto flex h-13 max-w-[1600px] items-center justify-between px-4 sm:px-6 lg:px-8">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-xl text-white shadow-sm">
                         <img
@@ -62,7 +63,7 @@ export function TopNav({ user, batch, pendingBatches, onSelectBatch }: TopNavPro
                         />              
                     </div>
           <div>
-            <p className="font-michroma font-bold text-sm tracking-widest text-slate-950">ELEVATEC</p>
+            <img src={logoliteral} className="h-6 w-auto" alt="Elevatec Logo" width="50" />
             <p className="text-xs font-medium text-slate-500">Gestión de solicitudes</p>
           </div>
           <div ref={batchRef} className="relative ml-3 hidden items-center gap-2 border-l border-slate-200 pl-5 lg:flex">
@@ -124,23 +125,31 @@ export function TopNav({ user, batch, pendingBatches, onSelectBatch }: TopNavPro
         </button>
       </div>
       {isMenuOpen &&
-      <div id="mobile-menu" className="border-t border-slate-200 bg-white px-4 py-4 md:hidden">
-          <div className="mx-auto max-w-[1600px] space-y-3">
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-800">{user.initials}</div>
-              <div><p className="text-sm font-bold text-slate-800">{user.name}</p><p className="text-xs text-slate-500">{user.role}</p></div>
+      <div id="mobile-menu" className="border-t border-slate-200 bg-white px-4 py-1 md:hidden">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4">
+            <div className="min-w-0 space-y-1">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-800">
+                  {user.initials}
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold text-slate-800">{user.name}</p>
+                  {/*<p className="text-xs text-slate-500">{user.role}</p>*/}
+                </div>
+              </div>
+          
+              {/*<p className="text-xs font-semibold text-slate-500">
+                Lote · {batchLabel}
+              </p>*/}
             </div>
-            <p className="text-xs font-semibold text-slate-500">Lote · {batchLabel}</p>
-            {pendingBatches.length > 1 && (
-              <select value={batch?.id ?? ""} onChange={(event) => selectBatch(Number(event.target.value))} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100">
-                {pendingBatches.map((item) => <option key={item.id} value={item.id}>{item.code}</option>)}
-              </select>
-            )}
-            {notifications.items.slice(0, 3).map((item) => (
-              <p key={item.id} className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600"><strong className="block text-slate-800">{item.title}</strong>{item.message}</p>
-            ))}
-            <button onClick={logout} type="button" className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-700">
-              <LogOutIcon className="h-4 w-4" />Cerrar sesión
+          
+            <button
+              onClick={logout}
+              type="button"
+              className="flex min-h-[40px] flex-col items-center justify-center gap-1 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-700"
+            >
+              <LogOutIcon className="h-4 w-10" aria-hidden="true" />
+              Cerrar sesión
             </button>
           </div>
         </div>
