@@ -7,6 +7,7 @@ use App\Http\Resources\BatchResource;
 use App\Models\Batch;
 use App\Models\FinancialRequest;
 use App\Models\User;
+use App\Notifications\BatchActivity;
 use App\Notifications\BatchCompleted;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -62,9 +63,31 @@ class BatchController extends Controller
 
     public function show(Batch $batch): BatchResource
     {
-        $batch->load(['requests.reviewer', 'uploader'])->loadTotals();
+        $batch->load([
+            'uploader',
+            ...collect(RequestController::ROW_RELATIONS)->map(fn (string $relation) => "requests.{$relation}")->all(),
+        ])->loadTotals();
 
         return new BatchResource($batch);
+    }
+
+    /**
+     * Admin: reabre un lote finalizado para corregir decisiones. Se avisa a Secretaría.
+     */
+    public function reopen(Request $request, Batch $batch): JsonResponse|BatchResource
+    {
+        if (! $batch->isCompleted()) {
+            return response()->json(['message' => "El lote {$batch->code} ya está en revisión."], 422);
+        }
+
+        $batch->update(['status' => Batch::STATUS_PENDING, 'completed_at' => null]);
+
+        Notification::send(
+            User::where('role', User::ROLE_SECRETARIA)->get(),
+            new BatchActivity($batch, "Lote {$batch->code} reabierto", "{$request->user()->name} reabrió el lote para revisar decisiones. Espera el nuevo cierre antes de procesarlo."),
+        );
+
+        return $this->show($batch);
     }
 
     public function finalize(Request $request, Batch $batch): JsonResponse|BatchResource
@@ -75,6 +98,14 @@ class BatchController extends Controller
 
         if (! $batch->requests()->exists()) {
             return response()->json(['message' => "El lote {$batch->code} no tiene solicitudes; no se puede finalizar."], 422);
+        }
+
+        $waitingInfo = $batch->requests()->where('status', FinancialRequest::STATUS_INFO)->count();
+
+        if ($waitingInfo > 0) {
+            return response()->json([
+                'message' => "Hay {$waitingInfo} solicitudes esperando más información de Secretaría.",
+            ], 422);
         }
 
         $pending = $batch->requests()->where('status', FinancialRequest::STATUS_PENDING)->pluck('id');

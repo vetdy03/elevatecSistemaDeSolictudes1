@@ -19,7 +19,7 @@ class ReportFilterRequest extends FormRequest
     {
         return [
             'batch_id' => ['nullable', 'integer', 'exists:batches,id'],
-            'status' => ['nullable', Rule::in([...FinancialRequest::STATUSES, 'Decididos'])],
+            'status' => ['nullable', Rule::in([...FinancialRequest::STATUSES, 'Decididos'])], // incluye "Más info"
             'category' => ['nullable', 'string', 'max:120'],
             'region' => ['nullable', 'string', 'max:80'],
         ];

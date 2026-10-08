@@ -30,6 +30,8 @@ class RequestsImport implements ToCollection, WithHeadingRow, WithCalculatedForm
         'currency' => ['moneda', 'currency'],
         'procedure' => ['n_tramite', 'no_tramite', 'nro_tramite', 'numero_tramite', 'n_de_tramite', 'tramite', 'procedure'],
         'requester' => ['solicitado_por', 'solicitante', 'requester'],
+        // Opcional: puede faltar la columna o venir vacía
+        'authorized_by' => ['autorizado_por', 'autorizado', 'autorizo', 'autorizada_por', 'authorized_by'],
         'priority' => ['prioridad', 'priority'],
         'region' => ['regional', 'region'],
         'category' => ['categoria', 'category'],
@@ -85,6 +87,7 @@ class RequestsImport implements ToCollection, WithHeadingRow, WithCalculatedForm
                 'currency' => $this->parseCurrency($field('currency')),
                 'procedure' => $field('procedure') !== null ? trim((string) $field('procedure')) : null,
                 'requester' => $field('requester'),
+                'authorized_by' => $field('authorized_by') !== null ? mb_substr(trim((string) $field('authorized_by')), 0, 120) : null,
                 'priority' => $this->parsePriority($field('priority')),
                 'region' => $field('region'),
                 'category' => $field('category') !== null ? mb_strtoupper((string) $field('category')) : $currentCategory,

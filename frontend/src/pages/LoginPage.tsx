@@ -1,5 +1,5 @@
 import { FormEvent, useState } from "react";
-import { EyeIcon, EyeOffIcon, LoaderCircleIcon, LockIcon, MailIcon, ShieldCheckIcon } from "lucide-react";
+import { EyeIcon, EyeOffIcon, LoaderCircleIcon, LockIcon, MailIcon } from "lucide-react";
 import { ApiError } from "../api/client";
 import { useAuth } from "../hooks/useAuth";
 import logo from "../assets/images.jpg";

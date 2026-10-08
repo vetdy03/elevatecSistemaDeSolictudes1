@@ -226,8 +226,13 @@ Todas las rutas cuelgan de `/api` y requieren sesión, salvo `POST /login`. El c
 | GET | `/batches?status=&q=&from=&to=` | todos | Listado / histórico de lotes |
 | GET | `/batches/active` | todos | Lote pendiente más reciente con sus solicitudes |
 | GET | `/batches/{id}` | todos | Lote con sus solicitudes |
-| POST | `/batches/{id}/finalize` | admin | Finaliza el lote y notifica a Secretaría. Responde 422 si quedan pendientes |
-| PATCH | `/requests/{id}/status` | admin | `{ "status": "Aprobado" \| "Rechazado" \| "Pendiente" }` |
+| POST | `/batches/{id}/finalize` | admin | Finaliza el lote y notifica a Secretaría. Responde 422 si quedan pendientes o en "Más info" |
+| POST | `/batches/{id}/reopen` | admin | Reabre un lote finalizado para corregir decisiones; notifica a Secretaría |
+| PATCH | `/requests/{id}/status` | admin | `{ "status": "Aprobado" \| "Rechazado" \| "Pendiente", "reason": "…" }`. `reason` es obligatorio al rechazar (mín. 5 caracteres) |
+| POST | `/requests/{id}/info` | admin | Pide más información `{ "question": "…" }`: la fila pasa a "Más info" y se notifica a Secretaría |
+| GET | `/requests/info-pending` | admin, secretaría | Solicitudes de cualquier lote que esperan respuesta de Secretaría |
+| POST | `/requests/{id}/info/answer` | admin, secretaría | Responde (`answer` + `attachment` opcional PDF/JPG/PNG, máx. 10 MB): vuelve a Pendiente marcada "Respondida" |
+| GET | `/requests/{id}/events/{evento}/attachment` | admin, secretaría | Descarga el adjunto de una respuesta |
 | POST | `/requests` | admin, secretaría | Agrega una fila manual a un lote pendiente |
 | GET | `/requests/options` | todos | Categorías y regionales usadas (autocompletar) |
 | POST | `/excel/preview` | admin, secretaría | Valida un .xlsx/.csv sin guardar nada |
@@ -243,7 +248,11 @@ En los reportes, `status` acepta `Aprobado`, `Rechazado`, `Pendiente` o `Decidid
 
 La primera fila son los encabezados. No importan mayúsculas ni tildes:
 
-`Fecha | Detalle | Importe | Moneda | N° trámite | Solicitado por | Prioridad | Regional | Categoría`
+`Fecha | Detalle | Importe | Moneda | N° trámite | Solicitado por | Autorizado por | Prioridad | Regional | Categoría`
+
+- **Autorizado por:** opcional. Puede venir llena, vacía o no existir la columna.
+- **N° de trámite repetido:** dentro del mismo archivo bloquea la publicación. Si ya existe **vigente** en otro lote, se avisa (posible doble pago). Si coincide con una solicitud **rechazada** (mismo N° de trámite, o mismo solicitante + importe + moneda en los últimos 90 días), se marca como reintento con un ícono ↻ visible solo para el Admin.
+- **Código de lote:** la numeración se reinicia cada mes (`N° 01-NOV-26`, `N° 02-NOV-26`…).
 
 - **Fecha:** `29/09/2026`, `2026-09-29`, `29 Sep` o fecha de Excel. Si se deja vacía, se usa la fecha de hoy.
 - **Importe:** acepta `18400`, `18.400`, `18.400,50` o `18,400.50`.

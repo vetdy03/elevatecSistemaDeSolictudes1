@@ -30,9 +30,12 @@
         table.rows tfoot td { background: #0f172a; color: #fff; font-weight: bold; padding: 8px 5px; font-size: 10px; }
         .right { text-align: right; }
         .badge { padding: 1px 5px; border-radius: 6px; font-size: 7.5px; font-weight: bold; }
-        .b-Aprobado { background: #ecfdf5; color: #047857; }
-        .b-Rechazado { background: #fff1f2; color: #be123c; }
-        .b-Pendiente { background: #fffbeb; color: #b45309; }
+        .b-aprobado { background: #ecfdf5; color: #047857; }
+        .b-rechazado { background: #fff1f2; color: #be123c; }
+        .b-pendiente { background: #fffbeb; color: #b45309; }
+        .b-mas-info { background: #fff7ed; color: #c2410c; }
+        .sub { display: block; margin-top: 2px; font-size: 7.5px; color: #64748b; }
+        .reason { display: block; margin-top: 2px; font-size: 7.5px; color: #be123c; }
         .footer { position: fixed; bottom: -20px; left: 0; right: 0; color: #94a3b8; font-size: 7.5px; }
     </style>
 </head>
@@ -74,14 +77,14 @@
             <tr>
                 <td>{{ $r->item_number }}</td>
                 <td>{{ $r->request_date->format('d/m/Y') }}</td>
-                <td>{{ $r->detail }}</td>
+                <td>{{ $r->detail }}@if ($r->rejection_reason)<span class="reason">Motivo: {{ $r->rejection_reason }}</span>@endif</td>
                 <td class="right">{{ $money($r->amount) }}</td>
                 <td>{{ $r->currency }}</td>
                 <td>{{ $r->procedure }}</td>
-                <td>{{ $r->requester }}</td>
+                <td>{{ $r->requester }}<span class="sub">Autorizó: {{ $r->authorized_by ?? '—' }}</span></td>
                 <td>{{ $r->priority }}</td>
                 <td>{{ $r->region }}</td>
-                <td><span class="badge b-{{ $r->status }}">{{ $r->status }}</span></td>
+                <td><span class="badge b-{{ \Illuminate\Support\Str::slug($r->status) }}">{{ $r->status }}</span></td>
                 @if ($full)
                     <td>{{ $r->reviewer?->name ?? '—' }}</td>
                     <td>{{ $r->reviewed_at?->format('d/m/Y H:i') ?? '—' }}</td>

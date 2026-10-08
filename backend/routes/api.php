@@ -23,14 +23,19 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/batches/{batch}', [BatchController::class, 'show']);
     Route::get('/requests/options', [RequestController::class, 'options']);
 
-    // Admin: decisiones y cierre de lote
+    // Admin: decisiones, pedidos de más información, cierre y reapertura de lote
     Route::middleware('role:admin')->group(function () {
         Route::patch('/requests/{financialRequest}/status', [RequestController::class, 'updateStatus']);
+        Route::post('/requests/{financialRequest}/info', [RequestController::class, 'requestInfo']);
         Route::post('/batches/{batch}/finalize', [BatchController::class, 'finalize']);
+        Route::post('/batches/{batch}/reopen', [BatchController::class, 'reopen']);
     });
 
-    // Secretaría (y Admin): carga de lotes, filas manuales y reportes
+    // Secretaría (y Admin): carga de lotes, filas manuales, respuestas "Más info" y reportes
     Route::middleware('role:admin,secretaria')->group(function () {
+        Route::get('/requests/info-pending', [RequestController::class, 'infoPending']);
+        Route::post('/requests/{financialRequest}/info/answer', [RequestController::class, 'answerInfo']);
+        Route::get('/requests/{financialRequest}/events/{event}/attachment', [RequestController::class, 'attachment']);
         Route::post('/requests', [RequestController::class, 'store']);
         Route::post('/excel/preview', [ExcelController::class, 'preview']);
         Route::post('/excel/import', [ExcelController::class, 'import']);

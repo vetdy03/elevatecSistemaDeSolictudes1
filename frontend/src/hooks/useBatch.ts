@@ -43,19 +43,37 @@ export function useBatch(batchId: number | null) {
     reload();
   }, [reload]);
 
-  const updateStatus = useCallback(async (id: number, status: RequestStatus) => {
+  // Reemplaza una fila con la versión del servidor y refleja "Última actualización".
+  const replaceRow = (row: FinancialRequest) => {
+    setRequests((rows) => rows.map((current) => (current.id === row.id ? row : current)));
+    setBatch((current) => (current ? { ...current, updatedAt: new Date().toISOString() } : current));
+  };
+
+  /** Decisión del Admin. Rechazar exige motivo (reason). Pendiente = deshacer. */
+  const updateStatus = useCallback(async (id: number, status: RequestStatus, reason?: string) => {
     const previous = requestsRef.current;
-    setRequests((rows) => rows.map((row) => (row.id === id ? { ...row, status } : row)));
+    setRequests((rows) => rows.map((row) => (row.id === id ? { ...row, status, rejectionReason: reason ?? null } : row)));
     try {
-      const res = await api<{ data: FinancialRequest }>(`/requests/${id}/status`, { method: "PATCH", body: json({ status }) });
-      setRequests((rows) => rows.map((row) => (row.id === id ? res.data : row)));
-      // El servidor actualizó updated_at del lote: reflejarlo en "Última actualización".
-      setBatch((current) => (current ? { ...current, updatedAt: new Date().toISOString() } : current));
+      const res = await api<{ data: FinancialRequest }>(`/requests/${id}/status`, { method: "PATCH", body: json({ status, reason }) });
+      replaceRow(res.data);
     } catch (err) {
       setRequests(previous);
       throw err;
     }
   }, []);
+
+  /** Admin: pide más información sobre una fila (pasa a "Más info" y se avisa a Secretaría). */
+  const requestInfo = useCallback(async (id: number, question: string) => {
+    const res = await api<{ data: FinancialRequest }>(`/requests/${id}/info`, { method: "POST", body: json({ question }) });
+    replaceRow(res.data);
+  }, []);
+
+  /** Admin: reabre un lote finalizado para corregir decisiones. */
+  const reopen = useCallback(async () => {
+    if (!batch) return;
+    const res = await api<{ data: Batch }>(`/batches/${batch.id}/reopen`, { method: "POST" });
+    apply(res.data);
+  }, [batch]);
 
   const finalize = useCallback(async () => {
     if (!batch) return;
@@ -73,5 +91,5 @@ export function useBatch(batchId: number | null) {
     return { request: res.data, warning: res.warning };
   }, [batch]);
 
-  return { batch, requests, loading, error, reload, updateStatus, finalize, addRequest };
+  return { batch, requests, loading, error, reload, updateStatus, requestInfo, finalize, reopen, addRequest };
 }

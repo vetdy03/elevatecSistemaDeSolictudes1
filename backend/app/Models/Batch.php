@@ -68,19 +68,22 @@ class Batch extends Model
     }
 
     /**
-     * Genera el siguiente código correlativo: "N° 09-OCT-26".
+     * Genera el siguiente código del mes: "N° 01-OCT-26", "N° 02-OCT-26"…
+     * La numeración vuelve a 01 cada mes; el código sigue siendo único porque incluye mes y año.
      */
     public static function nextCode(?Carbon $date = null): string
     {
         $date ??= now();
-        $sequence = (int) static::pluck('code')
-            ->map(fn (string $code) => preg_match('/(\d+)-[A-Z]{3}-\d{2}$/', $code, $m) ? (int) $m[1] : 0)
+        $suffix = sprintf('-%s-%s', self::MONTHS[$date->month - 1], $date->format('y'));
+
+        $sequence = (int) static::where('code', 'like', "%{$suffix}")
+            ->pluck('code')
+            ->map(fn (string $code) => preg_match('/(\d+)'.preg_quote($suffix, '/').'$/', $code, $m) ? (int) $m[1] : 0)
             ->max() + 1;
 
-        do {
-            $code = sprintf('N° %02d-%s-%s', $sequence, self::MONTHS[$date->month - 1], $date->format('y'));
+        while (static::where('code', $code = sprintf('N° %02d%s', $sequence, $suffix))->exists()) {
             $sequence++;
-        } while (static::where('code', $code)->exists());
+        }
 
         return $code;
     }

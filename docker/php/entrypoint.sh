@@ -28,7 +28,9 @@ if [ -n "$DB_HOST" ]; then
   done
 fi
 
-mkdir -p storage/app storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs bootstrap/cache
+# storage/app/private guarda los adjuntos. Se crea aquí (y se entrega a www-data) para que un
+# "docker compose exec app php artisan ..." ejecutado como root no la cree antes con dueño root.
+mkdir -p storage/app/private storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs bootstrap/cache
 chown -R www-data:www-data storage bootstrap/cache
 
 if [ "${RUN_MIGRATIONS:-false}" = "true" ]; then

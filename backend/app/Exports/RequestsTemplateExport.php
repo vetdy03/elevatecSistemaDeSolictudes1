@@ -15,13 +15,14 @@ class RequestsTemplateExport implements FromArray, WithHeadings, WithStyles, Sho
 {
     public function headings(): array
     {
-        return ['Fecha', 'Detalle', 'Importe', 'Moneda', 'N° trámite', 'Solicitado por', 'Prioridad', 'Regional', 'Categoría'];
+        // "Autorizado por" es opcional: puede quedar vacía o eliminarse la columna.
+        return ['Fecha', 'Detalle', 'Importe', 'Moneda', 'N° trámite', 'Solicitado por', 'Autorizado por', 'Prioridad', 'Regional', 'Categoría'];
     }
 
     public function array(): array
     {
         return [
-            [now()->format('d/m/Y'), 'Ejemplo: compra de insumos de oficina', 1500, 'Bs', 'TR-00001', 'Nombre Apellido', 'Media', 'La Paz', 'OTROS GASTOS DE LA EMPRESA'],
+            [now()->format('d/m/Y'), 'Ejemplo: compra de insumos de oficina', 1500, 'Bs', 'TR-00001', 'Nombre Apellido', 'Jefe de área (opcional)', 'Media', 'La Paz', 'OTROS GASTOS DE LA EMPRESA'],
         ];
     }
 

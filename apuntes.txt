@@ -1,17 +1,101 @@
-al dalr eclik en otificaciones deberia mandarle directamente a la vista al cual se le mandola notificacion 
+GENERAL
 
-historial de lotes deberia de poder desplegar
+en ver historial de lotes deberia de poder desplegar al darle click al lote y alli mismo que tenga la opcion de descargar 
+- en hisorico de lotes al revisar las lista de lotes quisiera que el boton de desplegar lote sea un boton mas largo y el de descargar igual que sea un pcoo mas largo. y ademas en me muestre un reporte alli nomasia de cauntos hay rechazados y cuantos hay aprobados.
+- quiero modificar mi plantilla de excel con unanueva columan que sera "autorizado por" y sus valores sean opcionales no es necesario que tenga si o si un campo y eso se debe demostrar en la vista del admin(veloya tu como mostrralo)
 
-deberia de poder ver la secretaria el estado de cauntso rechazados aceptados
-la secretaria no llegas sus notificaciones al admin
-mandar un link osea permitir copiar un link y mandarselo
+ADMIN
+- en la seccion de aprobar y rechazar quiero tener un boton mas que diga solictar mas informacion y deberia ser revisado por secretaria dando mas informacion y com se mostraria esto.?
+- Quiero com admin rechazar y a la hora de rechazar quiero que se despliegue un modal como textarea para ingresar el motivo de mi rechazoy que no permita rechazar hasta que se llene el motivo
+
+- la linea que divide cada solicitud de la otra se vea mas pronunciada o que sea un color opaco intercalado.
+- com admin quiero poder modificar el estado de una solicitud en caso de que me arrepienta
+- si secretaria sube nuevamente una solicitud por viveza criolla la solicitud se rechazada nuevamente ya que el admin no se acuerda. como controlaria esto pero sin hacerle notar mucho a jhenny.
+en la vista del admin. quiero como pestañas de: Lote activo y Historico de lotes, no quiero filtrar buscando, quiero una pestaña alli directamente con los aprobados, rechazados, pendientes y de los cuales haya solicitado mas informacion
+- mientas vaya aprobado o rechazando quiero que se orden por rechazados o aprobados, desde l aparte de arriba los aprobados y en l parte de abajo los rechazados, si hay un aprobado y un rechazado y otro aprobdo el rechazado deberia de poder bajarse..
 
 
 
-MEJORAS
+SECRETARIA
+- en ver historial de lotes deberia de poder desplegar al darle click al lote de solciitud 
+- error a corregir de la secretaria no llegas sus notificaciones al admin cuando ha enviado un lote
+- como secretaria quisiera poder mandar un link tipo compartir el lote con el admin
+- en la seccion de lotes subidos por secretaria que el numero de lote sea secuencial actualmente lo es. por el lapso del mes nomas el numero de lote y el mes termina que la parte numerica empiece con desde 1 otra vez.
+- cuando exsta una solicitud rechazda por el admin y vuelvo a subir se enviara en otro lote con una marca de que esa solicitud ha sido rechazado pero se esta volviendo subir o en el mismo lote. me refiero a ue deberia de tener una marca
+- 
 
-Quiero com admin rechazar y a la hora de rechazar quiero que se despliegue un modal con areatex para ingresar el motivo de mi rechazo y una opcion que diga solictar mas informacion 
-que sea secuencias por el lapso del mes nomas el numero de lote
-notificiones de parte de la secretaria no le llegan al admin
+MEJORAS DE ESTETICA
+luego
 
-si una solicitud de un lote ha sido rechazado y el admin a solicitado mas informacion 
+
+
+
+
+
+---
+
+## 1. Historial de lotes (aplica a Admin y Secretaría — un solo componente si es posible)
+
+- Al hacer click en un lote, desplegar el detalle inline (no navegar a otra pantalla).
+- Dentro del detalle desplegado, incluir botón "Descargar".
+- Los botones "Desplegar lote" y "Descargar" deben ser más anchos: proponé el valor Tailwind exacto 
+- En el detalle desplegado, mostrar mini-resumen: cantidad de aprobadas y rechazadas del lote.
+- Mismo comportamiento para Admin y Secretaría.
+
+---
+
+## 2. Plantilla Excel: nueva columna "Autorizado por"
+
+- Agregar columna "autorizado por" a la plantilla de importación.
+- Es OPCIONAL: puede venir vacía.
+- En la vista del Admin, mostrar el valor si existe. Si no existe, proponé cómo mostrarlo (guion, 
+- Actualizar la validación de importación para que NO falle si viene vacía.
+
+Terminado cuando: subo Excel con la columna llena, con la columna vacía, y sin la columna → los tres casos pasan sin error.
+
+---
+
+## 3. Acciones del Admin sobre solicitudes
+
+- **Nuevo botón "Solicitar más información"**: la solicitud pasa a un estado nuevo. Secretaría lo ve y puede responder/adjuntar. PROPUESTA PRIMERO: definime el flujo de estados en texto y esperá mi OK antes de codear.
+- **Rechazar abre modal con textarea de motivo.** El botón de confirmar rechazo está deshabilitado hasta que el textarea tenga contenido. El motivo se guarda y se muestra después en el detalle.
+- **Cambiar estado de solicitud ya resuelta** (arrepentirse): PROPUESTA PRIMERO — definí si reabre el flujo completo o solo cambia el label. Esperá mi OK.
+- **Separación visual entre solicitudes:** proponé 2 opciones (línea más gruesa vs. filas intercaladas con color opaco) 
+
+Terminado cuando: los 4 puntos están implementados con las decisiones que yo aprobé.
+
+---
+
+## 4. Reenvío de solicitud rechazada (control anti-reenvío)
+
+Problema: Secretaría sube una solicitud ya rechazada y el Admin no lo nota.
+
+- Si Secretaría reenvía una solicitud previamente rechazada en otro lote por vivesa, debe quedar marcada visualmente como "reintento de solicitud rechazada".
+- La marca tiene que ser DISCRETA: ícono o badge pequeño, NO banner rojo ni texto acusatorio. Tiene que ser visible para el Admin pero no señalizar a Secretaría.
+Terminado cuando: reenvío una solicitud rechazada → el Admin ve la marca discreta → es imposible que pase desapercibido.
+
+---
+
+## 5. Vista Admin: pestañas en vez de filtros
+
+- Reemplazar filtro/buscador por pestañas principales: `Lote activo` | `Histórico de lotes` | aprobados | rechazados | solictaste mas info. | pendientes.
+- Ordenamiento dinámico: al aprobar/rechazar, los aprobados suben y los rechazados bajan. Si hay aprobado-rechazado-aprobado, el rechazado se hunde.
+
+---
+
+## 6. Secretaría
+
+- **Ver historial de lotes:** mismo comportamiento de despliegue que el punto 1 (mismo componente).
+- **Bug — notificaciones al Admin no llegan cuando Secretaría envía un lote.** 
+- **Botón "Compartir lote"** (link tipo share) para mandar al Admin. PROPUESTA PRIMERO: cómo se genera el link y cómo lo recibe el Admin.
+- **Numeración secuencial de lotes:** reiniciar el contador a 1 al empezar cada mes. 
+
+mejoras 12:00 jueves
+SECRETARIA
+como secretaria registrar hora de subida mas de lote por secretaria 
+
+ADMIN
+desde la el rol de admin en la vista rechazdas quiero tener la opcion de abrir lote
+
+cosas a eliminar
+esto podriamos deshacer: - Ordenamiento dinámico: al aprobar/rechazar, los aprobados suben y los rechazados bajan. Si hay aprobado-rechazado-aprobado, el rechazado se hunde.

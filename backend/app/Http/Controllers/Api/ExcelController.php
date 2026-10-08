@@ -10,11 +10,15 @@ use App\Http\Resources\BatchResource;
 use App\Imports\RequestsImport;
 use App\Models\Batch;
 use App\Models\FinancialRequest;
+use App\Models\User;
+use App\Notifications\BatchActivity;
+use App\Support\Money;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Throwable;
@@ -50,7 +54,8 @@ class ExcelController extends Controller
     /**
      * N° de trámite repetidos:
      *  - dentro del mismo archivo → error (bloquea la publicación);
-     *  - ya registrados en otro lote → advertencia (se permite publicar, puede ser un reingreso).
+     *  - VIGENTES (no rechazados) en otro lote → advertencia: posible doble pago.
+     *    Los que fueron RECHAZADOS no se avisan aquí: se marcan como reintento solo para el Admin.
      *
      * @return list<string> advertencias
      */
@@ -64,7 +69,7 @@ class ExcelController extends Controller
             }
         }
 
-        $existing = FinancialRequest::findByProcedures($byProcedure->keys()->all());
+        $existing = FinancialRequest::findActiveDuplicates($byProcedure->keys()->all());
 
         return $byProcedure
             ->filter(fn ($rows, $procedure) => $existing->has($procedure))
@@ -112,6 +117,16 @@ class ExcelController extends Controller
 
         $batch->loadTotals();
 
+        Notification::send(
+            User::where('role', User::ROLE_ADMIN)->get(),
+            new BatchActivity($batch, "Nuevo lote {$batch->code} para revisar", sprintf(
+                '%s publicó el lote con %d solicitudes: %s.',
+                $request->user()->name,
+                $batch->items,
+                Money::format(['Bs' => (float) $batch->total, 'USD' => (float) $batch->total_usd], 0),
+            )),
+        );
+
         return (new BatchResource($batch))->response()->setStatusCode(201);
     }
 
@@ -127,7 +142,11 @@ class ExcelController extends Controller
         // Sin "touch" del lote por cada fila: el lote se acaba de crear.
         FinancialRequest::withoutTouching(function () use ($batch, $import) {
             foreach ($import->rows as $i => $row) {
+                // Reintento de una solicitud rechazada en otro lote → marca discreta para el Admin
+                $rejectedOriginal = FinancialRequest::findRejectedOriginal($row['procedure'], $row['requester'], $row['amount'], $row['currency'], $batch->id);
+
                 $batch->requests()->create([
+                    'retry_of_id' => $rejectedOriginal?->id,
                     'item_number' => $i + 1,
                     'request_date' => $row['date'],
                     'detail' => $row['detail'],
@@ -135,6 +154,7 @@ class ExcelController extends Controller
                     'currency' => $row['currency'],
                     'procedure' => $row['procedure'],
                     'requester' => $row['requester'],
+                    'authorized_by' => $row['authorized_by'],
                     'priority' => $row['priority'],
                     'region' => $row['region'],
                     'category' => $row['category'],

@@ -18,8 +18,8 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 class RequestsExport implements FromArray, WithHeadings, WithStyles, WithColumnFormatting, ShouldAutoSize, WithTitle
 {
     private const COLUMNS = [
-        'N°', 'Fecha', 'Detalle', 'Importe', 'Moneda', 'N° trámite', 'Solicitado por',
-        'Prioridad', 'Regional', 'Categoría', 'Estado', 'Revisado por', 'Fecha revisión',
+        'N°', 'Fecha', 'Detalle', 'Importe', 'Moneda', 'N° trámite', 'Solicitado por', 'Autorizado por',
+        'Prioridad', 'Regional', 'Categoría', 'Estado', 'Motivo de rechazo', 'Revisado por', 'Fecha revisión',
     ];
 
     /**
@@ -53,10 +53,12 @@ class RequestsExport implements FromArray, WithHeadings, WithStyles, WithColumnF
             $r->currency,
             $r->procedure,
             $r->requester,
+            $r->authorized_by ?? '—',
             $r->priority,
             $r->region,
             $r->category,
             $r->status,
+            $r->rejection_reason ?? '',
             $r->reviewer?->name ?? '',
             $r->reviewed_at?->format('d/m/Y H:i') ?? '',
         ])->all();
@@ -89,8 +91,8 @@ class RequestsExport implements FromArray, WithHeadings, WithStyles, WithColumnF
         $firstTotalRow = $this->rows->count() + 4;
         $lastTotalRow = $firstTotalRow + count($this->totalRows()) - 1;
 
-        $sheet->mergeCells('A1:M1');
-        $sheet->mergeCells('A2:M2');
+        $sheet->mergeCells('A1:O1');
+        $sheet->mergeCells('A2:O2');
         $sheet->freezePane('A4');
 
         return [

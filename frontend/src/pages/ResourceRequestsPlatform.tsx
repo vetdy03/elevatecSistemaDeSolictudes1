@@ -1,19 +1,28 @@
 import React, { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import Swal from "sweetalert2";
 import { motion } from "framer-motion";
-import { CheckCircle2Icon, ClipboardListIcon, FileDownIcon, FileSpreadsheetIcon, FileUpIcon, InboxIcon, LoaderCircleIcon, PlusIcon, SendIcon, UploadCloudIcon } from "lucide-react";
+import { CheckCircle2Icon, ClipboardListIcon, FileDownIcon, FileSpreadsheetIcon, FileUpIcon, InboxIcon, LoaderCircleIcon, LockOpenIcon, MessageCircleQuestionIcon, PlusIcon, RotateCcwIcon, SendIcon, UploadCloudIcon } from "lucide-react";
 import { ApiError, api, download } from "../api/client";
 import { HistoryPanel } from "../components/HistoryPanel";
 import { RequestTable } from "../components/RequestTable";
 import { useBatch } from "../hooks/useBatch";
+import { useInfoPending } from "../hooks/useInfoPending";
+import { askAnswer, askText, confirmAction } from "../lib/dialogs";
 import { formatCurrency, formatLongDate, formatMoney, formatUpdated, sumByCurrency, todayIso } from "../lib/format";
-import { Batch, Currency, FinancialRequest, ImportPreview, MoneyTotals, Priority, RequestStatus, UserRole } from "../types";
+import { Batch, Currency, FinancialRequest, ImportPreview, MoneyTotals, Priority, RequestAction, RequestStatus, UserRole } from "../types";
 
-type AdminTab = "activo" | "historial";
+/** Pestañas de estado del Admin: filtran el lote que se está viendo. */
+type AdminTab = "activo" | RequestStatus | "historial";
+const STATUS_TABS: { key: RequestStatus; label: string }[] = [
+  { key: "Pendiente", label: "Pendientes" },
+  { key: "Más info", label: "Más info" },
+  { key: "Aprobado", label: "Aprobadas" },
+  { key: "Rechazado", label: "Rechazadas" }
+];
 type SecretaryTab = "cargar" | "monitoreo";
 type BatchState = ReturnType<typeof useBatch>;
-/** Montos por moneda (Bs y USD no se suman entre sí) y cantidad de filas pendientes. */
-interface Totals {requested: MoneyTotals;approved: MoneyTotals;rejected: MoneyTotals;pending: number;}
+/** Montos por moneda (Bs y USD no se suman entre sí), conteos por estado y reintentos. */
+interface Totals {requested: MoneyTotals;approved: MoneyTotals;rejected: MoneyTotals;counts: Record<RequestStatus, number>;retries: number;}
 
 interface ResourceRequestsPlatformProps {
   role: UserRole;
@@ -41,7 +50,11 @@ export function ResourceRequestsPlatform({ role, batchState, refreshKey, focusSi
   const [secretaryTab, setSecretaryTab] = useState<SecretaryTab>("cargar");
   const [highlightPending, setHighlightPending] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const totals = useMemo<Totals>(() => ({ requested: sumByCurrency(requests), approved: sumByCurrency(requests, (row) => row.status === "Aprobado"), rejected: sumByCurrency(requests, (row) => row.status === "Rechazado"), pending: requests.filter((row) => row.status === "Pendiente").length }), [requests]);
+  const totals = useMemo<Totals>(() => {
+    const counts: Record<RequestStatus, number> = { Pendiente: 0, "Más info": 0, Aprobado: 0, Rechazado: 0 };
+    requests.forEach((row) => { counts[row.status] += 1; });
+    return { requested: sumByCurrency(requests), approved: sumByCurrency(requests, (row) => row.status === "Aprobado"), rejected: sumByCurrency(requests, (row) => row.status === "Rechazado"), counts, retries: requests.filter((row) => row.retry).length };
+  }, [requests]);
 
   useEffect(() => setHighlightPending(false), [batch?.id]);
 
@@ -53,21 +66,50 @@ export function ResourceRequestsPlatform({ role, batchState, refreshKey, focusSi
   }, [focusSignal]);
 
   const showToast = (message: string) => {setToast(message);window.setTimeout(() => setToast(null), 2600);};
+  const showError = (title: string, err: unknown) => {setToast(null);Swal.fire({ icon: "error", title, text: errorMessage(err, "Inténtalo de nuevo."), confirmButtonColor: "#0f4c81" });};
 
-  const updateStatus = async (id: number, status: RequestStatus) => {
+  /** Acciones del Admin. Pulsar de nuevo la acción ya activa la deshace (vuelve a Pendiente). */
+  const handleAction = async (request: FinancialRequest, action: RequestAction) => {
+    const context = `${request.procedure} · ${request.detail}`;
     try {
-      const pending = batchState.updateStatus(id, status);
-      showToast(status === "Aprobado" ? "Solicitud aprobada y total actualizado" : "Solicitud rechazada y total actualizado");
-      await pending;
+      if (action === "approve") {
+        const undo = request.status === "Aprobado";
+        const saving = batchState.updateStatus(request.id, undo ? "Pendiente" : "Aprobado");
+        showToast(undo ? "Aprobación deshecha: la solicitud volvió a pendiente" : "Solicitud aprobada y total actualizado");
+        await saving;
+      } else if (action === "reject") {
+        if (request.status === "Rechazado") {
+          const saving = batchState.updateStatus(request.id, "Pendiente");
+          showToast("Rechazo deshecho: la solicitud volvió a pendiente");
+          await saving;
+          return;
+        }
+        const reason = await askText({ title: "Motivo del rechazo", text: context, placeholder: "Explica por qué se rechaza esta solicitud…", confirmText: "Confirmar rechazo", confirmColor: "#be123c" });
+        if (!reason) return;
+        const saving = batchState.updateStatus(request.id, "Rechazado", reason);
+        showToast("Solicitud rechazada y total actualizado");
+        await saving;
+      } else if (request.status === "Más info") {
+        if (!(await confirmAction("¿Cancelar el pedido de información?", "La solicitud volverá a pendiente. La pregunta queda registrada.", "Sí, cancelar pedido"))) return;
+        await batchState.updateStatus(request.id, "Pendiente");
+        showToast("Pedido de información cancelado");
+      } else {
+        const question = await askText({ title: "Solicitar más información", text: context, placeholder: "¿Qué necesitas que Secretaría aclare o adjunte?", confirmText: "Enviar a Secretaría", confirmColor: "#ea580c" });
+        if (!question) return;
+        await batchState.requestInfo(request.id, question);
+        showToast("Pedido de información enviado a Secretaría");
+      }
     } catch (err) {
-      setToast(null);
-      Swal.fire({ icon: "error", title: "No se guardó la decisión", text: errorMessage(err, "Inténtalo de nuevo."), confirmButtonColor: "#0f4c81" });
+      showError("No se guardó el cambio", err);
     }
   };
 
   const finalize = async () => {
     if (!batch) return;
-    if (totals.pending > 0) {setHighlightPending(true);await Swal.fire({ icon: "warning", title: "Aún hay solicitudes sin decisión", text: `Revisa las ${totals.pending} filas resaltadas antes de finalizar el lote.`, confirmButtonText: "Continuar revisando", confirmButtonColor: "#b45309" });return;}
+    const { Pendiente: pending, "Más info": waitingInfo } = totals.counts;
+    if (waitingInfo > 0) {setHighlightPending(true);await Swal.fire({ icon: "warning", title: "Hay solicitudes esperando información", text: `${waitingInfo} solicitudes esperan la respuesta de Secretaría. Decide después de recibirla o cancela el pedido.`, confirmButtonText: "Entendido", confirmButtonColor: "#b45309" });return;}
+    if (pending > 0) {setHighlightPending(true);await Swal.fire({ icon: "warning", title: "Aún hay solicitudes sin decisión", text: `Revisa las ${pending} filas resaltadas antes de finalizar el lote.`, confirmButtonText: "Continuar revisando", confirmButtonColor: "#b45309" });return;}
+    if (!(await confirmAction(`¿Finalizar el lote ${batch.code}?`, "Se notificará a Secretaría con el resultado. Después solo podrás cambiar decisiones reabriendo el lote.", "Finalizar y notificar"))) return;
     try {
       await batchState.finalize();
       setHighlightPending(false);
@@ -78,7 +120,19 @@ export function ResourceRequestsPlatform({ role, batchState, refreshKey, focusSi
         setHighlightPending(true);
         await batchState.reload();
       }
-      Swal.fire({ icon: "error", title: "No se pudo finalizar el lote", text: errorMessage(err, "Inténtalo de nuevo."), confirmButtonColor: "#0f4c81" });
+      showError("No se pudo finalizar el lote", err);
+    }
+  };
+
+  const reopen = async () => {
+    if (!batch) return;
+    if (!(await confirmAction(`¿Reabrir el lote ${batch.code}?`, "Volverá a “En revisión” para corregir decisiones y se notificará a Secretaría. Al terminar, finalízalo de nuevo.", "Reabrir lote", "#b45309"))) return;
+    try {
+      await batchState.reopen();
+      onBatchesChanged();
+      showToast(`Lote ${batch.code} reabierto`);
+    } catch (err) {
+      showError("No se pudo reabrir el lote", err);
     }
   };
 
@@ -86,7 +140,7 @@ export function ResourceRequestsPlatform({ role, batchState, refreshKey, focusSi
   const showActiveBatch = () => onOpenBatch(null);
 
   return <main className="min-h-[calc(100vh-4rem)] bg-slate-50"><div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{toast && <div role="status" className="fixed bottom-5 right-5 z-50 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-lg">{toast}</div>}
-    {role === "Admin" && <AdminWorkspace onReset={showActiveBatch} batchState={batchState} totals={totals} adminTab={adminTab} setAdminTab={setAdminTab} updateStatus={updateStatus} finalize={finalize} highlightPending={highlightPending} refreshKey={refreshKey} onOpenBatch={openFromHistory} />}
+    {role === "Admin" && <AdminWorkspace onReset={showActiveBatch} batchState={batchState} totals={totals} adminTab={adminTab} setAdminTab={setAdminTab} onAction={handleAction} finalize={finalize} reopen={reopen} highlightPending={highlightPending} refreshKey={refreshKey} onOpenBatch={openFromHistory} />}
     {role === "Secretaría" && <SecretaryWorkspace onReset={showActiveBatch} batchState={batchState} tab={secretaryTab} setTab={setSecretaryTab} showToast={showToast} refreshKey={refreshKey} onBatchesChanged={onBatchesChanged} onOpenBatch={onOpenBatch} onOpenFromHistory={openFromHistory} />}
     {role === "Colaborador" && <ViewerWorkspace onReset={showActiveBatch} batch={batch} requests={requests} loading={loading} error={error} refreshKey={refreshKey} onOpenBatch={openFromHistory} />}
   </div></main>;
@@ -99,15 +153,24 @@ function BatchStatus({ loading, error, batch, onReset, children }: {loading: boo
   return <>{children}</>;
 }
 
-interface AdminProps {onReset: () => void;batchState: BatchState;totals: Totals;adminTab: AdminTab;setAdminTab: (value: AdminTab) => void;updateStatus: (id: number, status: RequestStatus) => void;finalize: () => void;highlightPending: boolean;refreshKey: number;onOpenBatch: (id: number) => void;}
-function AdminWorkspace({ onReset, batchState, totals, adminTab, setAdminTab, updateStatus, finalize, highlightPending, refreshKey, onOpenBatch }: AdminProps) {
+interface AdminProps {onReset: () => void;batchState: BatchState;totals: Totals;adminTab: AdminTab;setAdminTab: (value: AdminTab) => void;onAction: (request: FinancialRequest, action: RequestAction) => void;finalize: () => void;reopen: () => void;highlightPending: boolean;refreshKey: number;onOpenBatch: (id: number) => void;}
+function AdminWorkspace({ onReset, batchState, totals, adminTab, setAdminTab, onAction, finalize, reopen, highlightPending, refreshKey, onOpenBatch }: AdminProps) {
   const { batch, requests, loading, error } = batchState;
   const completed = batch?.status === "Completado";
-  return <><div className="mb-6 border-b border-slate-200"><nav aria-label="Secciones de administrador" className="flex gap-5"><Tab label="Lote activo" active={adminTab === "activo"} onClick={() => setAdminTab("activo")} /><Tab label="Histórico de lotes" active={adminTab === "historial"} onClick={() => setAdminTab("historial")} /></nav></div>
-    {adminTab === "activo" ? <BatchStatus loading={loading} error={error} batch={batch} onReset={onReset}>{batch && <><BatchHeading batch={batch} totals={totals} /><RequestTable requests={requests} onStatusChange={updateStatus} highlightPending={highlightPending} viewer={completed} />
-      {completed ? <div className="mt-5 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"><strong>Lote finalizado</strong>{batch.completedAt && ` el ${formatLongDate(batch.completedAt)}`}. Las decisiones ya no pueden modificarse.</div> : <div className="mt-5 flex flex-col items-start justify-between gap-3 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 sm:flex-row sm:items-center"><p className="text-sm text-blue-950"><strong>Control de cierre:</strong> {requests.length === 0 ? "Este lote no tiene solicitudes; no se puede finalizar." : totals.pending ? `${totals.pending} solicitudes esperan tu decisión.` : "Todas las solicitudes fueron revisadas."}</p><button onClick={finalize} disabled={requests.length === 0} type="button" className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-800 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-colors duration-150 hover:bg-blue-950 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"><SendIcon className="h-4 w-4" />Finalizar y notificar lote</button></div>}</>}</BatchStatus> : <HistoryPanel onOpen={onOpenBatch} refreshKey={refreshKey} />}</>;
+  const undecided = totals.counts.Pendiente + totals.counts["Más info"];
+  const statusTab = STATUS_TABS.find((tab) => tab.key === adminTab);
+  const visible = statusTab ? requests.filter((row) => row.status === statusTab.key) : requests;
+
+  return <><div className="mb-6 border-b border-slate-200"><nav aria-label="Secciones de administrador" className="-mb-px flex gap-5 overflow-x-auto whitespace-nowrap">
+    <Tab label="Lote activo" active={adminTab === "activo"} onClick={() => setAdminTab("activo")} />
+    {STATUS_TABS.map((tab) => <Tab key={tab.key} label={`${tab.label} (${totals.counts[tab.key]})`} active={adminTab === tab.key} onClick={() => setAdminTab(tab.key)} />)}
+    <Tab label="Histórico de lotes" active={adminTab === "historial"} onClick={() => setAdminTab("historial")} />
+  </nav></div>
+    {adminTab === "historial" ? <HistoryPanel onOpen={onOpenBatch} refreshKey={refreshKey} /> : <BatchStatus loading={loading} error={error} batch={batch} onReset={onReset}>{batch && <><BatchHeading batch={batch} totals={totals} />
+      {visible.length === 0 && statusTab ? <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">No hay solicitudes en “{statusTab.label}” en este lote.</div> : <RequestTable requests={visible} authorizedColumn onAction={completed ? undefined : onAction} highlightPending={highlightPending} />}
+      {adminTab === "activo" && (completed ? <div className="mt-5 flex flex-col items-start justify-between gap-3 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 sm:flex-row sm:items-center"><p className="text-sm text-emerald-900"><strong>Lote finalizado</strong>{batch.completedAt && ` el ${formatLongDate(batch.completedAt)}`}. Para cambiar una decisión, reabre el lote.</p><button onClick={reopen} type="button" className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-amber-300 bg-white px-4 py-2.5 text-sm font-bold text-amber-800 transition-colors duration-150 hover:bg-amber-50 sm:w-auto"><LockOpenIcon className="h-4 w-4" />Reabrir lote</button></div> : <div className="mt-5 flex flex-col items-start justify-between gap-3 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 sm:flex-row sm:items-center"><p className="text-sm text-blue-950"><strong>Control de cierre:</strong> {requests.length === 0 ? "Este lote no tiene solicitudes; no se puede finalizar." : undecided ? `${undecided} solicitudes esperan tu decisión${totals.counts["Más info"] ? ` (${totals.counts["Más info"]} con pedido de más información)` : ""}.` : "Todas las solicitudes fueron revisadas."}</p><button onClick={finalize} disabled={requests.length === 0} type="button" className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-800 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-colors duration-150 hover:bg-blue-950 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"><SendIcon className="h-4 w-4" />Finalizar y notificar lote</button></div>)}</>}</BatchStatus>}</>;
 }
-function BatchHeading({ batch, totals }: {batch: Batch;totals: Totals;}) {const completed = batch.status === "Completado";return <section className="mb-5"><div className="flex flex-col gap-3 rounded-t-2xl bg-slate-950 px-5 py-5 text-white md:flex-row md:items-center md:justify-between"><div><div className="flex flex-wrap items-center gap-2"><span className="rounded-md bg-blue-800 px-2 py-1 text-xs font-bold">{batch.code}</span>{completed ? <span className="rounded-full bg-emerald-400/20 px-2 py-1 text-xs font-bold text-emerald-200">COMPLETADO</span> : <span className="rounded-full bg-amber-400/20 px-2 py-1 text-xs font-bold text-amber-200">EN REVISIÓN</span>}</div><h2 className="mt-3 text-lg font-bold sm:text-xl">{batch.title}</h2></div><p className="text-sm text-slate-300">Última actualización · {formatUpdated(batch.updatedAt)}</p></div><div className="grid grid-cols-2 divide-x divide-y divide-slate-200 overflow-hidden rounded-b-2xl border border-slate-200 bg-white md:grid-cols-4 md:divide-y-0"><Metric label="Total solicitado" value={totals.requested} tone="text-slate-950" /><Metric label="Total aprobado" value={totals.approved} tone="text-emerald-700" /><Metric label="Total rechazado" value={totals.rejected} tone="text-rose-700" /><div className="p-4"><p className="text-xs font-semibold text-slate-500">Filas pendientes</p><p className="mt-1 text-2xl font-bold tabular-nums text-amber-700">{totals.pending}</p></div></div></section>;}
+function BatchHeading({ batch, totals }: {batch: Batch;totals: Totals;}) {const completed = batch.status === "Completado";const undecided = totals.counts.Pendiente + totals.counts["Más info"];return <section className="mb-5"><div className="flex flex-col gap-3 rounded-t-2xl bg-slate-950 px-5 py-5 text-white md:flex-row md:items-center md:justify-between"><div><div className="flex flex-wrap items-center gap-2"><span className="rounded-md bg-blue-800 px-2 py-1 text-xs font-bold">{batch.code}</span>{completed ? <span className="rounded-full bg-emerald-400/20 px-2 py-1 text-xs font-bold text-emerald-200">COMPLETADO</span> : <span className="rounded-full bg-amber-400/20 px-2 py-1 text-xs font-bold text-amber-200">EN REVISIÓN</span>}{totals.retries > 0 && <span title="Solicitudes que repiten una rechazada en otro lote (marcadas con ↻ en la tabla)" className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-1 text-xs font-semibold text-slate-200"><RotateCcwIcon className="h-3 w-3" />{totals.retries} {totals.retries === 1 ? "reintento" : "reintentos"}</span>}</div><h2 className="mt-3 text-lg font-bold sm:text-xl">{batch.title}</h2></div><p className="text-sm text-slate-300">Última actualización · {formatUpdated(batch.updatedAt)}</p></div><div className="grid grid-cols-2 divide-x divide-y divide-slate-200 overflow-hidden rounded-b-2xl border border-slate-200 bg-white md:grid-cols-4 md:divide-y-0"><Metric label="Total solicitado" value={totals.requested} tone="text-slate-950" /><Metric label="Total aprobado" value={totals.approved} tone="text-emerald-700" /><Metric label="Total rechazado" value={totals.rejected} tone="text-rose-700" /><div className="p-4"><p className="text-xs font-semibold text-slate-500">Filas pendientes</p><p className="mt-1 text-2xl font-bold tabular-nums text-amber-700">{undecided}</p>{totals.counts["Más info"] > 0 && <p className="text-xs text-orange-700">{totals.counts["Más info"]} esperan más información</p>}</div></div></section>;}
 function Metric({ label, value, tone }: {label: string;value: MoneyTotals;tone: string;}) {const text = formatMoney(value);return <div className="p-4"><p className="text-xs font-semibold text-slate-500">{label}</p><motion.p key={text} initial={{ opacity: 0.35, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.18, ease: "easeOut" }} className={`mt-1 text-xl font-bold tabular-nums ${tone}`}>{text}</motion.p></div>;}
 function Tab({ label, active, onClick }: {label: string;active: boolean;onClick: () => void;}) {return <button onClick={onClick} type="button" className={`border-b-2 px-1 pb-3 text-sm font-bold transition-colors duration-150 ${active ? "border-blue-700 text-blue-800" : "border-transparent text-slate-500 hover:text-slate-800"}`}>{label}</button>;}
 
@@ -117,8 +180,37 @@ function Tab({ label, active, onClick }: {label: string;active: boolean;onClick:
 
 interface SecretaryProps {onReset: () => void;batchState: BatchState;tab: SecretaryTab;setTab: (tab: SecretaryTab) => void;showToast: (message: string) => void;refreshKey: number;onBatchesChanged: () => void;onOpenBatch: (id: number | null) => void;onOpenFromHistory: (id: number) => void;}
 function SecretaryWorkspace({ onReset, batchState, tab, setTab, showToast, refreshKey, onBatchesChanged, onOpenBatch, onOpenFromHistory }: SecretaryProps) {
-  return <><div className="mb-6 flex flex-col gap-4 border-b border-slate-200 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-sm font-semibold text-blue-800">Recepción y control</p><h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Operación de lotes</h1></div><nav className="flex gap-5"><Tab label="Cargar nuevo lote" active={tab === "cargar"} onClick={() => setTab("cargar")} /><Tab label="Lotes enviados" active={tab === "monitoreo"} onClick={() => setTab("monitoreo")} /></nav></div>
-    {tab === "cargar" ? <section className="grid gap-5 lg:grid-cols-[1.1fr_.9fr]"><ImportCard onPublished={() => {onBatchesChanged();onOpenBatch(null);}} /><ManualEntryCard batchState={batchState} showToast={showToast} /></section> : <MonitorPanel onReset={onReset} batchState={batchState} refreshKey={refreshKey} onOpenBatch={onOpenFromHistory} />}</>;
+  const info = useInfoPending(refreshKey);
+
+  const respond = async (item: FinancialRequest) => {
+    const question = [...(item.conversation ?? [])].reverse().find((entry) => entry.type === "question")?.body ?? "";
+    const result = await askAnswer(question);
+    if (!result) return;
+    try {
+      await info.answer(item.id, result.answer, result.attachment);
+      showToast("Respuesta enviada al Administrador");
+      if (batchState.batch?.id === item.batchId) batchState.reload();
+    } catch (err) {
+      Swal.fire({ icon: "error", title: "No se pudo enviar la respuesta", text: errorMessage(err, "Inténtalo de nuevo."), confirmButtonColor: "#0f4c81" });
+    }
+  };
+
+  return <><div className="mb-6 flex flex-col gap-4 border-b border-slate-200 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-sm font-semibold text-blue-800">Recepción y control</p><h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Operación de lotes</h1></div><nav className="flex gap-5"><Tab label="Cargar nuevo lote" active={tab === "cargar"} onClick={() => setTab("cargar")} /><Tab label={info.items.length ? `Lotes enviados (${info.items.length} por responder)` : "Lotes enviados"} active={tab === "monitoreo"} onClick={() => setTab("monitoreo")} /></nav></div>
+    {tab === "cargar" ? <section className="grid gap-5 lg:grid-cols-[1.1fr_.9fr]"><ImportCard onPublished={() => {onBatchesChanged();onOpenBatch(null);}} /><ManualEntryCard batchState={batchState} showToast={showToast} /></section> : <><InfoPendingPanel items={info.items} onRespond={respond} /><MonitorPanel onReset={onReset} batchState={batchState} refreshKey={refreshKey} onOpenBatch={onOpenFromHistory} /></>}</>;
+}
+
+function InfoPendingPanel({ items, onRespond }: {items: FinancialRequest[];onRespond: (item: FinancialRequest) => void;}) {
+  if (items.length === 0) return null;
+  return <section className="mb-6 rounded-2xl border border-orange-200 bg-orange-50 p-5">
+    <div className="flex items-start gap-3"><div className="rounded-xl bg-white p-2.5 text-orange-600"><MessageCircleQuestionIcon className="h-5 w-5" /></div><div><h2 className="font-bold text-orange-950">El Administrador pidió más información ({items.length})</h2><p className="mt-1 text-sm text-orange-800">Responde para que pueda decidir. Puedes adjuntar un PDF o una imagen.</p></div></div>
+    <ul className="mt-4 space-y-2">{items.map((item) => {
+      const question = [...(item.conversation ?? [])].reverse().find((entry) => entry.type === "question");
+      return <li key={item.id} className="flex flex-col gap-3 rounded-xl bg-white p-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0"><p className="text-xs font-semibold text-slate-500">{item.batchCode} · {item.procedure} · {item.currency} {formatCurrency(item.amount)}</p><p className="mt-0.5 text-sm font-bold text-slate-900">{item.detail}</p>{question && <p className="mt-2 rounded-md bg-orange-50 px-2 py-1 text-sm text-orange-900"><strong>Pregunta de {question.user ?? "Admin"}:</strong> {question.body}</p>}</div>
+        <button type="button" onClick={() => onRespond(item)} className="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-lg bg-blue-800 px-4 py-2.5 text-sm font-bold text-white transition-colors duration-150 hover:bg-blue-950 sm:w-44"><SendIcon className="h-4 w-4" />Responder</button>
+      </li>;
+    })}</ul>
+  </section>;
 }
 
 function ImportCard({ onPublished }: {onPublished: () => void;}) {
@@ -192,7 +284,7 @@ function parseAmount(text: string): number {
 }
 
 interface RequestOptions {categories: string[];regions: string[];}
-const emptyForm = { detail: "", amount: "", currency: "Bs" as Currency, priority: "" as Priority | "", procedure: "", requester: "", region: "", category: "", date: "" };
+const emptyForm = { detail: "", amount: "", currency: "Bs" as Currency, priority: "" as Priority | "", procedure: "", requester: "", authorizedBy: "", region: "", category: "", date: "" };
 
 function ManualEntryCard({ batchState, showToast }: {batchState: BatchState;showToast: (message: string) => void;}) {
   const { batch } = batchState;
@@ -215,7 +307,7 @@ function ManualEntryCard({ batchState, showToast }: {batchState: BatchState;show
     if (!Number.isFinite(amount) || amount <= 0) {setFormError("Ingresa un importe válido.");return;}
     setSaving(true);
     try {
-      const { warning } = await batchState.addRequest({ batch_id: batch.id, detail: form.detail, amount, currency: form.currency, priority: form.priority, procedure: form.procedure, requester: form.requester, region: form.region, category: form.category, date: form.date || undefined });
+      const { warning } = await batchState.addRequest({ batch_id: batch.id, detail: form.detail, amount, currency: form.currency, priority: form.priority, procedure: form.procedure, requester: form.requester, authorized_by: form.authorizedBy.trim() || undefined, region: form.region, category: form.category, date: form.date || undefined });
       setForm(emptyForm);
       if (warning) Swal.fire({ icon: "warning", title: "Fila agregada con advertencia", text: warning, confirmButtonColor: "#b45309" });
       else showToast(`Fila agregada al lote ${batch.code}`);
@@ -234,7 +326,8 @@ function ManualEntryCard({ batchState, showToast }: {batchState: BatchState;show
       <select value={form.currency} onChange={set("currency")} className={`${input} text-slate-700`}><option value="Bs">Bs</option><option value="USD">USD</option></select>
       <input required value={form.procedure} onChange={set("procedure")} placeholder="N° trámite" className={input} />
       <select required value={form.priority} onChange={set("priority")} className={`${input} ${form.priority ? "text-slate-700" : "text-slate-500"}`}><option value="" disabled>Prioridad</option><option>Alta</option><option>Media</option><option>Baja</option></select>
-      <input required value={form.requester} onChange={set("requester")} placeholder="Solicitado por" className={`col-span-2 ${input}`} />
+      <input required value={form.requester} onChange={set("requester")} placeholder="Solicitado por" className={input} />
+      <input value={form.authorizedBy} onChange={set("authorizedBy")} placeholder="Autorizado por (opcional)" className={input} />
       <input required value={form.region} onChange={set("region")} list="region-options" placeholder="Regional" className={input} />
       <input type="date" value={form.date} onChange={set("date")} aria-label="Fecha" className={`${input} text-slate-600`} />
       <input required value={form.category} onChange={set("category")} list="category-options" placeholder="Categoría" className={`col-span-2 ${input}`} />
@@ -270,9 +363,9 @@ function MonitorPanel({ onReset, batchState, refreshKey, onOpenBatch }: {onReset
 
   const select = "rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 outline-none focus:border-blue-600";
   return <><BatchStatus loading={loading} error={error} batch={batch} onReset={onReset}>{batch && <>
-    <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center"><p className="text-sm font-bold text-slate-800 sm:mr-auto">{batch.code} · <span className="font-medium text-slate-500">{batch.title}</span></p><select value={status} onChange={(event) => setStatus(event.target.value)} className={select} aria-label="Filtrar por estado"><option value="">Todos los estados</option><option value="Decididos">Aprobados y rechazados</option><option>Aprobado</option><option>Rechazado</option><option>Pendiente</option></select><select value={category} onChange={(event) => setCategory(event.target.value)} className={select} aria-label="Filtrar por categoría"><option value="">Todas las categorías</option>{categories.map((item) => <option key={item}>{item}</option>)}</select><select value={region} onChange={(event) => setRegion(event.target.value)} className={select} aria-label="Filtrar por regional"><option value="">Todas las regionales</option>{regions.map((item) => <option key={item}>{item}</option>)}</select></div>
+    <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center"><p className="text-sm font-bold text-slate-800 sm:mr-auto">{batch.code} · <span className="font-medium text-slate-500">{batch.title}</span></p><select value={status} onChange={(event) => setStatus(event.target.value)} className={select} aria-label="Filtrar por estado"><option value="">Todos los estados</option><option value="Decididos">Aprobados y rechazados</option><option>Aprobado</option><option>Rechazado</option><option>Pendiente</option><option>Más info</option></select><select value={category} onChange={(event) => setCategory(event.target.value)} className={select} aria-label="Filtrar por categoría"><option value="">Todas las categorías</option>{categories.map((item) => <option key={item}>{item}</option>)}</select><select value={region} onChange={(event) => setRegion(event.target.value)} className={select} aria-label="Filtrar por regional"><option value="">Todas las regionales</option>{regions.map((item) => <option key={item}>{item}</option>)}</select></div>
     <div className="mb-5 grid gap-3 sm:grid-cols-3"><ExportButton busy={busy === "xlsx"} onClick={() => exportFile("xlsx", "/excel/export", { status: status || "Decididos", category, region }, `${batch.code}.xlsx`)} icon={<FileSpreadsheetIcon className="h-5 w-5" />} label="Descargar Excel" detail={status ? "Con los filtros aplicados" : "Aprobados / rechazados"} /><ExportButton busy={busy === "pdf"} onClick={() => exportFile("pdf", "/pdf/export", { status, category, region }, `${batch.code}.pdf`)} icon={<FileDownIcon className="h-5 w-5" />} label="Descargar PDF" detail="Reporte filtrado" /><ExportButton busy={busy === "full"} onClick={() => exportFile("full", "/pdf/export", { full: "1" }, `${batch.code}-completo.pdf`)} icon={<ClipboardListIcon className="h-5 w-5" />} label="Reporte completo" detail="Lote y trazabilidad" /></div>
-    <RequestTable requests={filtered} onStatusChange={() => undefined} viewer /></>}</BatchStatus>
+    <RequestTable requests={filtered} authorizedColumn /></>}</BatchStatus>
     <div className="mt-8"><HistoryPanel onOpen={onOpenBatch} refreshKey={refreshKey} /></div></>;
 }
 function ExportButton({ icon, label, detail, onClick, busy }: {icon: React.ReactNode;label: string;detail: string;onClick: () => void;busy: boolean;}) {return <button onClick={onClick} disabled={busy} type="button" className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-colors duration-150 hover:border-blue-200 hover:bg-blue-50 disabled:opacity-60"><span className="rounded-lg bg-blue-50 p-2 text-blue-700">{busy ? <LoaderCircleIcon className="h-5 w-5 animate-spin" /> : icon}</span><span><span className="block text-sm font-bold text-slate-800">{label}</span><span className="block text-xs text-slate-500">{detail}</span></span></button>;}
@@ -281,4 +374,4 @@ function ExportButton({ icon, label, detail, onClick, busy }: {icon: React.React
 // Colaborador (solo lectura)
 // ---------------------------------------------------------------------------
 
-function ViewerWorkspace({ onReset, batch, requests, loading, error, refreshKey, onOpenBatch }: {onReset: () => void;batch: Batch | null;requests: FinancialRequest[];loading: boolean;error: string | null;refreshKey: number;onOpenBatch: (id: number) => void;}) {const active = requests.filter((item) => item.status !== "Pendiente").length;return <><section className="mb-5 rounded-2xl bg-slate-950 px-5 py-6 text-white"><p className="text-sm font-semibold text-blue-200">Acceso de solo lectura</p><h1 className="mt-1 text-2xl font-bold">Estado de solicitudes</h1><p className="mt-2 max-w-2xl text-sm text-slate-300">Consulta el avance del lote {batch ? batch.code : "actual"}. No tienes permisos para aprobar, rechazar ni modificar información.</p><div className="mt-5 flex items-center gap-3"><CheckCircle2Icon className="h-5 w-5 text-emerald-400" /><p className="text-sm"><strong>{active} de {requests.length}</strong> solicitudes ya fueron revisadas.</p></div></section><BatchStatus loading={loading} error={error} batch={batch} onReset={onReset}><RequestTable requests={requests} onStatusChange={() => undefined} viewer /></BatchStatus><div className="mt-8"><HistoryPanel onOpen={onOpenBatch} refreshKey={refreshKey} canDownload={false} /></div></>;}
+function ViewerWorkspace({ onReset, batch, requests, loading, error, refreshKey, onOpenBatch }: {onReset: () => void;batch: Batch | null;requests: FinancialRequest[];loading: boolean;error: string | null;refreshKey: number;onOpenBatch: (id: number) => void;}) {const active = requests.filter((item) => item.status !== "Pendiente").length;return <><section className="mb-5 rounded-2xl bg-slate-950 px-5 py-6 text-white"><p className="text-sm font-semibold text-blue-200">Acceso de solo lectura</p><h1 className="mt-1 text-2xl font-bold">Estado de solicitudes</h1><p className="mt-2 max-w-2xl text-sm text-slate-300">Consulta el avance del lote {batch ? batch.code : "actual"}. No tienes permisos para aprobar, rechazar ni modificar información.</p><div className="mt-5 flex items-center gap-3"><CheckCircle2Icon className="h-5 w-5 text-emerald-400" /><p className="text-sm"><strong>{active} de {requests.length}</strong> solicitudes ya fueron revisadas.</p></div></section><BatchStatus loading={loading} error={error} batch={batch} onReset={onReset}><RequestTable requests={requests} authorizedColumn /></BatchStatus><div className="mt-8"><HistoryPanel onOpen={onOpenBatch} refreshKey={refreshKey} canDownload={false} /></div></>;}
